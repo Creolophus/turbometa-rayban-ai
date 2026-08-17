@@ -9,16 +9,17 @@ struct OmniRealtimeView: View {
     @StateObject private var viewModel: OmniRealtimeViewModel
     @ObservedObject var streamViewModel: StreamSessionViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var frameTimer: Timer?
 
     init(streamViewModel: StreamSessionViewModel, apiKey: String) {
         self.streamViewModel = streamViewModel
-        self._viewModel = StateObject(wrappedValue: OmniRealtimeViewModel(apiKey: apiKey))
+        self._viewModel = StateObject(wrappedValue: OmniRealtimeViewModel(apiKey: apiKey, streamViewModel: streamViewModel))
     }
 
     var body: some View {
         ZStack {
             // Video background from glasses
-            if let videoFrame = streamViewModel.currentVideoFrame {
+            if viewModel.inputMode == .vision, let videoFrame = streamViewModel.currentVideoFrame {
                 Image(uiImage: videoFrame)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -31,6 +32,8 @@ struct OmniRealtimeView: View {
             VStack(spacing: 0) {
                 // Header
                 headerView
+
+                inputModeView
 
                 // Conversation history
                 ScrollViewReader { proxy in
@@ -72,17 +75,29 @@ struct OmniRealtimeView: View {
                 controlsView
             }
         }
-        .onAppear {
-            viewModel.connect()
-            // Update video frames
-            Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-                if let frame = streamViewModel.currentVideoFrame {
-                    viewModel.updateVideoFrame(frame)
-                }
+        .task {
+            // The realtime screen enters voice-only even when it was
+            // opened from the regular streaming screen.
+            if streamViewModel.streamingStatus != .stopped {
+                await streamViewModel.stopSession()
             }
+            guard !Task.isCancelled else { return }
+            viewModel.connect()
         }
         .onDisappear {
+            stopFrameUpdates()
             viewModel.disconnect()
+        }
+        .onChange(of: viewModel.inputMode) { mode in
+            if mode == .vision {
+                startFrameUpdates()
+            } else {
+                stopFrameUpdates()
+            }
+        }
+        .onChange(of: streamViewModel.streamingStatus) { status in
+            guard viewModel.inputMode == .vision, status != .streaming else { return }
+            viewModel.handleVisionStreamFailure()
         }
         .alert("错误", isPresented: $viewModel.showError) {
             Button("确定") {
@@ -93,6 +108,22 @@ struct OmniRealtimeView: View {
                 Text(error)
             }
         }
+    }
+
+    private func startFrameUpdates() {
+        frameTimer?.invalidate()
+        frameTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            Task { @MainActor in
+                guard viewModel.inputMode == .vision,
+                      let frame = streamViewModel.currentVideoFrame else { return }
+                viewModel.updateVideoFrame(frame)
+            }
+        }
+    }
+
+    private func stopFrameUpdates() {
+        frameTimer?.invalidate()
+        frameTimer = nil
     }
 
     // MARK: - Header
@@ -202,6 +233,36 @@ struct OmniRealtimeView: View {
                 endPoint: .bottom
             )
         )
+    }
+
+    private var inputModeView: some View {
+        VStack(spacing: 8) {
+            Picker("liveai.input.mode".localized, selection: Binding(
+                get: { viewModel.inputMode },
+                set: { mode in
+                    Task { await viewModel.setInputMode(mode) }
+                })) {
+                ForEach(LiveAIInputMode.allCases) { mode in
+                    Label(mode.displayName, systemImage: mode.icon)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(viewModel.isSwitchingInputMode)
+
+            HStack(spacing: 6) {
+                Image(systemName: viewModel.inputMode.icon)
+                Text(viewModel.inputMode.privacyDescription)
+                if viewModel.inputMode == .vision {
+                    Text("· " + String(format: "liveai.input.vision.count".localized, viewModel.sentImageCount))
+                }
+            }
+            .font(.caption)
+            .foregroundColor(.white.opacity(0.85))
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.65))
     }
 }
 

@@ -152,6 +152,7 @@
 
 // Model Settings
 "settings.model" = "Model Settings";
+"settings.vision.model" = "Image Recognition Model";
 "settings.model.select" = "Select Model";
 "settings.model.current" = "Currently using";
 "settings.model.alibaba" = "Alibaba Models";
@@ -172,11 +173,22 @@
 
 // Live AI Settings
 "settings.liveai" = "Live AI";
+"settings.liveai.engine" = "Real-time Conversation Engine";
+"settings.liveai.model" = "Real-time Model";
+"settings.liveai.engine.description" = "Affects Live AI voice and optional vision chat only; image recognition is separate.";
 "settings.liveai.provider" = "Live AI Provider";
 "settings.liveai.provider.select" = "Select Live AI Provider";
 "settings.liveai.provider.description" = "Choose the provider for real-time voice chat";
 "settings.liveai.alibaba.desc" = "Qwen Omni real-time audio model";
 "settings.liveai.google.desc" = "Gemini Live real-time audio model";
+
+// Live AI input/privacy
+"liveai.input.mode" = "Input Mode";
+"liveai.input.voice" = "Voice Only";
+"liveai.input.vision" = "Vision Chat";
+"liveai.input.voice.privacy" = "Voice only; camera is off";
+"liveai.input.vision.privacy" = "Sends one current frame when you speak";
+"liveai.input.vision.count" = "%d frame(s) sent in this session";
 
 "settings.language" = "Output Language";
 "settings.language.select" = "Select Output Language";
@@ -319,6 +331,8 @@
 "prompt.liveai.blind" = "You are a smart glasses assistant for visually impaired users.\n\n[IMPORTANT] Always respond in English.\n\nYour task is to help users understand their surroundings:\n1. Describe objects, people, and environment in detail\n2. Use clear directional words (ahead, left, right rear, etc.)\n3. Point out obstacles or hazards\n4. Read signs, menus, and other text\n5. Provide safe, practical navigation suggestions\n\nSpeak clearly and organized, prioritize the most important information.";
 "prompt.liveai.reading" = "You are a reading assistance AI.\n\n[IMPORTANT] Always respond in English.\n\nYour task is to help users read visible text:\n1. Accurately identify and read all visible text\n2. Organize content in correct reading order\n3. For documents, explain the structure\n4. For foreign languages, read then translate\n\nSpeak at moderate pace, articulate clearly, like a professional reader.";
 "prompt.liveai.translate" = "You are a real-time translation AI assistant.\n\n[IMPORTANT] Translation results must be in {LANGUAGE}.\n\nYour task is to help users understand foreign language content:\n1. Identify text in the view\n2. Translate to {LANGUAGE}\n3. For menus or signs, explain their purpose\n4. For technical terms, provide brief explanations\n\nTranslate accurately, naturally, and idiomatically.";
+"prompt.liveai.input.voice" = "[INPUT MODE: VOICE ONLY] The camera is off and you cannot currently see the user's surroundings. Never claim to see any object, person, text, or scene, and never guess from an image that was not provided. If a request requires visual information, clearly say that you cannot currently see it and ask the user to switch to Vision Chat. You may analyze an image only when the client actually sends a new image for that turn; never treat an older image as the current view.";
+"prompt.liveai.input.vision" = "[INPUT MODE: VISION CHAT] The client sends one latest image when the user begins speaking. Describe the environment only from an image actually received for the current turn. If no image was received, clearly say that you cannot currently see it and do not guess.";
 
 // MARK: - RTMP Streaming
 "rtmp.title" = "RTMP Streaming";

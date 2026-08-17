@@ -16,6 +16,9 @@ class LiveAIManager: ObservableObject {
     @Published var isRunning = false
     @Published var isConnected = false
     @Published var errorMessage: String?
+    @Published private(set) var inputMode: LiveAIInputMode = .voice
+    @Published private(set) var sentImageCount = 0
+    @Published private(set) var isSwitchingInputMode = false
 
     // 依赖
     private(set) var streamViewModel: StreamSessionViewModel?
@@ -25,11 +28,13 @@ class LiveAIManager: ObservableObject {
 
     // 视频帧
     private var currentVideoFrame: UIImage?
+    private var hasSentFirstAudio = false
     private var isImageSendingEnabled = false
     private var frameUpdateTimer: Timer?
 
     // 对话历史
     private var conversationHistory: [ConversationMessage] = []
+    private var initialInputMode: LiveAIInputMode = .voice
 
     // TTS
     private let tts = TTSService.shared
@@ -64,12 +69,6 @@ class LiveAIManager: ObservableObject {
             return
         }
 
-        guard let streamViewModel = streamViewModel else {
-            print("❌ [LiveAIManager] StreamViewModel not set")
-            tts.speak("Live AI 未初始化，请先打开应用")
-            return
-        }
-
         // 获取 API Key
         let apiKey = APIProviderManager.staticLiveAIAPIKey
         guard !apiKey.isEmpty else {
@@ -81,6 +80,12 @@ class LiveAIManager: ObservableObject {
         isRunning = true
         errorMessage = nil
         conversationHistory = []
+        inputMode = .voice
+        initialInputMode = .voice
+        sentImageCount = 0
+        hasSentFirstAudio = false
+        isImageSendingEnabled = false
+        currentVideoFrame = nil
 
         // 获取当前 provider
         provider = APIProviderManager.staticLiveAIProvider
@@ -88,32 +93,17 @@ class LiveAIManager: ObservableObject {
         print("🚀 [LiveAIManager] Starting Live AI session...")
 
         do {
-            // 1. 检查设备是否已连接
-            if !streamViewModel.hasActiveDevice {
+            // 1. 检查设备是否已连接. This is only a hardware/microphone
+            // guard; no DAT camera session is created in voice mode.
+            if let streamViewModel, !streamViewModel.hasActiveDevice {
                 print("❌ [LiveAIManager] No active device connected")
                 throw LiveAIError.noDevice
             }
 
-            // 2. 启动视频流（如果未启动）
-            if streamViewModel.streamingStatus != .streaming {
-                print("📹 [LiveAIManager] Starting stream...")
-                await streamViewModel.handleStartStreaming()
-
-                // 等待流进入 streaming 状态（最多 5 秒）
-                let streamReady = await waitForCondition(timeout: 5.0) {
-                    streamViewModel.streamingStatus == .streaming
-                }
-
-                if !streamReady {
-                    print("❌ [LiveAIManager] Failed to start streaming")
-                    throw LiveAIError.streamNotReady
-                }
-            }
-
-            // 3. 预配置音频会话（后台模式需要）
+            // 2. 预配置音频会话（后台模式需要）
             try configureAudioSessionForBackground()
 
-            // 4. 初始化 AI 服务
+            // 3. 初始化 AI 服务
             initializeService(apiKey: apiKey)
 
             // 4. 连接 AI 服务
@@ -130,11 +120,7 @@ class LiveAIManager: ObservableObject {
                 throw LiveAIError.connectionFailed
             }
 
-            // 5. 启动视频帧更新定时器
-            startFrameUpdateTimer()
-            print("✅ [LiveAIManager] Frame update timer started")
-
-            // 6. 直接开始录音（不播放 TTS，避免音频会话冲突）
+            // 5. 直接开始录音（不播放 TTS，避免音频会话冲突）
             print("🎤 [LiveAIManager] About to start recording...")
             startRecording()
 
@@ -196,20 +182,21 @@ class LiveAIManager: ObservableObject {
 
         omniService.onFirstAudioSent = { [weak self] in
             Task { @MainActor in
-                print("✅ [LiveAIManager] 收到第一次音频发送回调，启用图片发送")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    self?.isImageSendingEnabled = true
-                }
+                guard let self else { return }
+                self.hasSentFirstAudio = true
+                self.isImageSendingEnabled = self.inputMode == .vision
+                print("✅ [LiveAIManager] 收到第一次音频发送回调，图片权限=\(self.isImageSendingEnabled)")
             }
         }
 
         omniService.onSpeechStarted = { [weak self] in
             Task { @MainActor in
                 if let strongSelf = self,
-                   strongSelf.isImageSendingEnabled,
+                   strongSelf.canSendImages,
                    let frame = strongSelf.currentVideoFrame {
                     print("🎤📸 [LiveAIManager] 检测到用户语音，发送当前视频帧")
                     strongSelf.omniService?.sendImageAppend(frame)
+                    strongSelf.sentImageCount += 1
                 }
             }
         }
@@ -254,20 +241,21 @@ class LiveAIManager: ObservableObject {
 
         geminiService.onFirstAudioSent = { [weak self] in
             Task { @MainActor in
-                print("✅ [LiveAIManager] 收到第一次音频发送回调，启用图片发送")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    self?.isImageSendingEnabled = true
-                }
+                guard let self else { return }
+                self.hasSentFirstAudio = true
+                self.isImageSendingEnabled = self.inputMode == .vision
+                print("✅ [LiveAIManager] 收到第一次音频发送回调，图片权限=\(self.isImageSendingEnabled)")
             }
         }
 
         geminiService.onSpeechStarted = { [weak self] in
             Task { @MainActor in
                 if let strongSelf = self,
-                   strongSelf.isImageSendingEnabled,
+                   strongSelf.canSendImages,
                    let frame = strongSelf.currentVideoFrame {
                     print("🎤📸 [LiveAIManager] 检测到用户语音，发送当前视频帧")
                     strongSelf.geminiService?.sendImageInput(frame)
+                    strongSelf.sentImageCount += 1
                 }
             }
         }
@@ -298,6 +286,87 @@ class LiveAIManager: ObservableObject {
                 print("❌ [LiveAIManager] Gemini error: \(error)")
             }
         }
+    }
+
+    /// Whether the background Live AI session is currently permitted to send
+    /// a still frame. Voice mode always returns false.
+    var canSendImages: Bool {
+        inputMode == .vision &&
+            isImageSendingEnabled &&
+            streamViewModel?.streamingStatus == .streaming &&
+            currentVideoFrame != nil
+    }
+
+    /// Opts into or out of camera access without interrupting the realtime
+    /// audio WebSocket. This is also used by UI-driven sessions when Live AI
+    /// is running in the background.
+    func setInputMode(_ mode: LiveAIInputMode) async {
+        guard mode != inputMode else { return }
+        guard !isSwitchingInputMode else { return }
+
+        isSwitchingInputMode = true
+        defer { isSwitchingInputMode = false }
+
+        switch mode {
+        case .voice:
+            isImageSendingEnabled = false
+            inputMode = .voice
+            currentVideoFrame = nil
+            frameUpdateTimer?.invalidate()
+            frameUpdateTimer = nil
+            await streamViewModel?.stopSession()
+
+        case .vision:
+            guard let streamViewModel else {
+                fallbackToVoice("视觉模式需要已连接的眼镜")
+                return
+            }
+            guard streamViewModel.hasActiveDevice else {
+                fallbackToVoice("未连接眼镜，已切回纯语音")
+                return
+            }
+
+            if streamViewModel.streamingStatus != .streaming {
+                await streamViewModel.handleStartStreaming()
+            }
+            let streamReady = await waitForCondition(timeout: 5.0) {
+                streamViewModel.streamingStatus == .streaming
+            }
+            guard streamReady else {
+                await streamViewModel.stopSession()
+                fallbackToVoice("视觉流启动失败，已切回纯语音")
+                return
+            }
+
+            inputMode = .vision
+            isImageSendingEnabled = hasSentFirstAudio
+            startFrameUpdateTimer()
+        }
+    }
+
+    func switchInputMode(to mode: LiveAIInputMode) async {
+        await setInputMode(mode)
+    }
+
+    private func fallbackToVoice(_ message: String) {
+        inputMode = .voice
+        isImageSendingEnabled = false
+        currentVideoFrame = nil
+        frameUpdateTimer?.invalidate()
+        frameUpdateTimer = nil
+        errorMessage = message
+        tts.speak(message)
+    }
+
+    private func handleVisionStreamFailure() {
+        guard inputMode == .vision else { return }
+        isImageSendingEnabled = false
+        inputMode = .voice
+        currentVideoFrame = nil
+        frameUpdateTimer?.invalidate()
+        frameUpdateTimer = nil
+        errorMessage = "视觉流已断开，已切回纯语音"
+        tts.speak(errorMessage ?? "视觉流已断开，已切回纯语音")
     }
 
     // MARK: - Connection
@@ -343,6 +412,11 @@ class LiveAIManager: ObservableObject {
     }
 
     private func updateVideoFrame() {
+        guard inputMode == .vision else { return }
+        guard streamViewModel?.streamingStatus == .streaming else {
+            handleVisionStreamFailure()
+            return
+        }
         if let frame = streamViewModel?.currentVideoFrame {
             currentVideoFrame = frame
         }
@@ -382,6 +456,8 @@ class LiveAIManager: ObservableObject {
         geminiService = nil
         isConnected = false
         isRunning = false
+        inputMode = .voice
+        hasSentFirstAudio = false
         isImageSendingEnabled = false
         currentVideoFrame = nil
 
@@ -406,7 +482,9 @@ class LiveAIManager: ObservableObject {
         let record = ConversationRecord(
             messages: conversationHistory,
             aiModel: aiModel,
-            language: "zh-CN"
+            language: "zh-CN",
+            initialInputMode: initialInputMode,
+            visionFrameCount: sentImageCount
         )
 
         ConversationStorage.shared.saveConversation(record)

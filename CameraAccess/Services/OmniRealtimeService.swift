@@ -184,7 +184,10 @@ class OmniRealtimeService: NSObject {
     private func configureSession() {
         // 根据当前语言设置获取语音和提示词
         let voice = LanguageManager.staticTtsVoice
-        let instructions = LiveAIModeManager.staticSystemPrompt
+        // Every realtime session starts voice-only. The appended constraint
+        // also explains how to treat an image if the user opts into vision
+        // later without reconnecting this WebSocket.
+        let instructions = LiveAIModeManager.staticSystemPrompt(inputMode: .voice)
 
         let sessionConfig: [String: Any] = [
             "event_id": generateEventId(),

@@ -16,7 +16,10 @@ struct LiveAIView: View {
         self.streamViewModel = streamViewModel
         // Use the Live AI API key based on selected provider
         let liveAIApiKey = APIProviderManager.staticLiveAIAPIKey
-        self._viewModel = StateObject(wrappedValue: OmniRealtimeViewModel(apiKey: liveAIApiKey.isEmpty ? apiKey : liveAIApiKey))
+        self._viewModel = StateObject(wrappedValue: OmniRealtimeViewModel(
+            apiKey: liveAIApiKey.isEmpty ? apiKey : liveAIApiKey,
+            streamViewModel: streamViewModel
+        ))
     }
 
     var body: some View {
@@ -29,8 +32,9 @@ struct LiveAIView: View {
             if !streamViewModel.hasActiveDevice {
                 deviceNotConnectedView
             } else {
-                // Video feed (full opacity, no white mask)
-                if let videoFrame = streamViewModel.currentVideoFrame {
+                // Video is rendered only after the user explicitly opts into
+                // visual mode. Voice mode has no DAT camera session or frame.
+                if viewModel.inputMode == .vision, let videoFrame = streamViewModel.currentVideoFrame {
                     GeometryReader { geometry in
                         Image(uiImage: videoFrame)
                             .resizable()
@@ -45,6 +49,8 @@ struct LiveAIView: View {
                 // Header (紧贴状态栏)
                 headerView
                     .padding(.top, 8) // 状态栏下方一点点
+
+                inputModeView
 
                 // Conversation history (可隐藏)
                 if showConversation {
@@ -92,35 +98,27 @@ struct LiveAIView: View {
                 }
             }
         }
-        .onAppear {
+        .task {
             // 只有设备连接时才启动功能
             guard streamViewModel.hasActiveDevice else {
                 print("⚠️ LiveAIView: 未连接RayBan Meta眼镜，跳过启动")
                 return
             }
 
-            // 启动视频流
-            Task {
-                print("🎥 LiveAIView: 启动视频流")
-                await streamViewModel.handleStartStreaming()
+            // A previous feature may have left a DAT camera session active.
+            // Live AI always enters voice-only, so release that session before
+            // connecting the realtime audio service.
+            if streamViewModel.streamingStatus != .stopped {
+                await streamViewModel.stopSession()
             }
-
-            // 自动连接并开始录音
+            guard !Task.isCancelled else { return }
+            // 自动连接并开始录音。纯语音模式不启动视频帧轮询。
             viewModel.connect()
-
-            // 更新视频帧
-            frameTimer?.invalidate()
-            frameTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                if let frame = streamViewModel.currentVideoFrame {
-                    viewModel.updateVideoFrame(frame)
-                }
-            }
         }
         .onDisappear {
             // 停止 AI 对话和视频流
             print("🎥 LiveAIView: 停止 AI 对话和视频流")
-            frameTimer?.invalidate()
-            frameTimer = nil
+            stopFrameUpdates()
             viewModel.disconnect()
             Task {
                 if streamViewModel.streamingStatus != .stopped {
@@ -133,6 +131,17 @@ struct LiveAIView: View {
                 viewModel.startRecording()
             }
         }
+        .onChange(of: viewModel.inputMode) { mode in
+            if mode == .vision {
+                startFrameUpdates()
+            } else {
+                stopFrameUpdates()
+            }
+        }
+        .onChange(of: streamViewModel.streamingStatus) { status in
+            guard viewModel.inputMode == .vision, status != .streaming else { return }
+            viewModel.handleVisionStreamFailure()
+        }
         .alert("error".localized, isPresented: $viewModel.showError) {
             Button("ok".localized) {
                 viewModel.dismissError()
@@ -142,6 +151,22 @@ struct LiveAIView: View {
                 Text(error)
             }
         }
+    }
+
+    private func startFrameUpdates() {
+        frameTimer?.invalidate()
+        frameTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            Task { @MainActor in
+                guard viewModel.inputMode == .vision,
+                      let frame = streamViewModel.currentVideoFrame else { return }
+                viewModel.updateVideoFrame(frame)
+            }
+        }
+    }
+
+    private func stopFrameUpdates() {
+        frameTimer?.invalidate()
+        frameTimer = nil
     }
 
     // MARK: - Header
@@ -245,6 +270,36 @@ struct LiveAIView: View {
                 endPoint: .bottom
             )
         )
+    }
+
+    private var inputModeView: some View {
+        VStack(spacing: AppSpacing.xs) {
+            Picker("liveai.input.mode".localized, selection: Binding(
+                get: { viewModel.inputMode },
+                set: { mode in
+                    Task { await viewModel.switchInputMode(to: mode) }
+                })) {
+                ForEach(LiveAIInputMode.allCases) { mode in
+                    Label(mode.displayName, systemImage: mode.icon)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(viewModel.isSwitchingInputMode)
+
+            HStack(spacing: AppSpacing.xs) {
+                Image(systemName: viewModel.inputMode.icon)
+                Text(viewModel.inputMode.privacyDescription)
+                if viewModel.inputMode == .vision {
+                    Text("· " + String(format: "liveai.input.vision.count".localized, viewModel.sentImageCount))
+                }
+            }
+            .font(AppTypography.caption)
+            .foregroundColor(.white.opacity(0.85))
+        }
+        .padding(.horizontal, AppSpacing.md)
+        .padding(.vertical, AppSpacing.sm)
+        .background(Color.black.opacity(0.65))
     }
 
     // MARK: - Device Not Connected View

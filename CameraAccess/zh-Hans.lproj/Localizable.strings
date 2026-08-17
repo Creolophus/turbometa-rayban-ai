@@ -152,6 +152,7 @@
 
 // Model Settings
 "settings.model" = "模型设置";
+"settings.vision.model" = "图片识别模型";
 "settings.model.select" = "选择模型";
 "settings.model.current" = "当前使用";
 "settings.model.alibaba" = "阿里云模型";
@@ -172,11 +173,22 @@
 
 // Live AI Settings
 "settings.liveai" = "Live AI";
+"settings.liveai.engine" = "实时对话引擎";
+"settings.liveai.model" = "实时模型";
+"settings.liveai.engine.description" = "仅影响 Live AI 的实时语音与可选视觉对话；不影响图片识别。";
 "settings.liveai.provider" = "Live AI 提供商";
 "settings.liveai.provider.select" = "选择 Live AI 提供商";
 "settings.liveai.provider.description" = "选择用于实时语音对话的 AI 提供商";
 "settings.liveai.alibaba.desc" = "通义千问 Omni 实时音频模型";
 "settings.liveai.google.desc" = "Gemini Live 实时音频模型";
+
+// Live AI input/privacy
+"liveai.input.mode" = "输入模式";
+"liveai.input.voice" = "纯语音";
+"liveai.input.vision" = "视觉对话";
+"liveai.input.voice.privacy" = "仅发送语音，摄像头未启用";
+"liveai.input.vision.privacy" = "说话时发送一张当前画面";
+"liveai.input.vision.count" = "本次已发送 %d 张画面";
 
 "settings.language" = "输出语言";
 "settings.language.select" = "选择输出语言";
@@ -319,6 +331,8 @@
 "prompt.liveai.blind" = "你是视障用户的智能眼镜助手。\n\n【重要】必须始终用中文回答。\n\n你的任务是帮助用户理解周围环境：\n1. 详细描述周围的物体、人和环境\n2. 使用清晰的方位词（前方、左侧、右后方等）\n3. 指出可能的障碍物或危险\n4. 朗读标识、菜单等文字内容\n5. 提供安全、实用的导航建议\n\n说话清晰、有条理，优先说最重要的信息。";
 "prompt.liveai.reading" = "你是阅读辅助AI助手。\n\n【重要】必须始终用中文回答。\n\n你的任务是帮助用户阅读看到的文字：\n1. 准确识别并朗读所有可见文字\n2. 按照正确的阅读顺序组织内容\n3. 对于文档，说明文字的结构\n4. 对于外语，先读原文再翻译\n\n语速适中，吐字清晰，像一位专业的朗读者。";
 "prompt.liveai.translate" = "你是实时翻译AI助手。\n\n【重要】翻译结果必须使用{LANGUAGE}。\n\n你的任务是帮助用户理解看到的外语内容：\n1. 识别画面中的文字\n2. 翻译成{LANGUAGE}\n3. 如果是菜单或标识，说明其用途\n4. 对于专业术语，提供简单解释\n\n翻译要准确、自然、地道。";
+"prompt.liveai.input.voice" = "【输入模式：纯语音】摄像头已关闭，你当前看不到用户周围环境。不得声称看到任何物体、人物、文字或场景，不得根据未提供的画面猜测。如果问题必须依赖视觉信息，请明确说明当前看不到，并请用户切换到视觉对话。只有当客户端在某轮实际发送了新图片时，才可分析该图片；不得将旧图片当作当前画面。";
+"prompt.liveai.input.vision" = "【输入模式：视觉对话】客户端会在用户说话时发送一张最新图片。仅根据本轮实际收到的图片描述环境；如未收到图片，必须明确说明当前看不到，不得猜测。";
 
 // MARK: - RTMP 推流
 "rtmp.title" = "RTMP 推流";

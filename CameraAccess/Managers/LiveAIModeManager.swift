@@ -81,6 +81,13 @@ class LiveAIModeManager: ObservableObject {
         }
     }
 
+    /// Combines the selected persona with an explicit statement about the
+    /// media available to the model. Realtime sessions currently always begin
+    /// in voice mode, and may receive individual images later in the session.
+    func getSystemPrompt(inputMode: LiveAIInputMode) -> String {
+        getSystemPrompt() + "\n\n" + inputMode.systemPromptConstraint
+    }
+
     /// 获取指定模式的系统提示词
     func getSystemPrompt(for mode: LiveAIMode) -> String {
         switch mode {
@@ -122,6 +129,10 @@ class LiveAIModeManager: ObservableObject {
 
     static var staticSystemPrompt: String {
         return shared.getSystemPrompt()
+    }
+
+    static func staticSystemPrompt(inputMode: LiveAIInputMode) -> String {
+        shared.getSystemPrompt(inputMode: inputMode)
     }
 
     /// 是否在语音触发时自动发送图片

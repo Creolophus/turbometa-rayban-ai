@@ -5,6 +5,59 @@
 
 import Foundation
 
+// MARK: - Live AI Input Mode
+
+/// Controls whether a realtime Live AI session may access the glasses camera.
+///
+/// Voice mode is deliberately the default.  Selecting vision is an explicit
+/// opt-in and is the only state in which a DAT camera session may be started
+/// or an image may be appended to the realtime model session.
+enum LiveAIInputMode: String, CaseIterable, Codable, Identifiable {
+    case voice
+    case vision
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .voice:
+            return "liveai.input.voice".localized
+        case .vision:
+            return "liveai.input.vision".localized
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .voice:
+            return "mic.fill"
+        case .vision:
+            return "eye.fill"
+        }
+    }
+
+    var privacyDescription: String {
+        switch self {
+        case .voice:
+            return "liveai.input.voice.privacy".localized
+        case .vision:
+            return "liveai.input.vision.privacy".localized
+        }
+    }
+
+    /// Provider-neutral guard appended to the selected Live AI persona.
+    /// It describes the input the model actually receives instead of merely
+    /// advertising that the underlying model is vision-capable.
+    var systemPromptConstraint: String {
+        switch self {
+        case .voice:
+            return "prompt.liveai.input.voice".localized
+        case .vision:
+            return "prompt.liveai.input.vision".localized
+        }
+    }
+}
+
 // MARK: - Live AI Mode
 
 enum LiveAIMode: String, CaseIterable, Codable, Identifiable {

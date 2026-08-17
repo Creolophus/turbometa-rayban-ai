@@ -135,7 +135,7 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "cpu")
                                 .foregroundColor(AppColors.accent)
-                            Text("settings.model".localized)
+                            Text("settings.vision.model".localized)
                                 .foregroundColor(AppColors.textPrimary)
                             Spacer()
                             Text(providerManager.selectedModel)
@@ -233,7 +233,7 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "waveform.circle.fill")
                                 .foregroundColor(AppColors.primary)
-                            Text("settings.liveai.provider".localized)
+                            Text("settings.liveai.engine".localized)
                                 .foregroundColor(AppColors.textPrimary)
                             Spacer()
                             Text(providerManager.liveAIProvider.displayName)
@@ -703,7 +703,7 @@ struct VisionModelSettingsView: View {
                     openRouterModelList
                 }
             }
-            .navigationTitle("settings.model".localized)
+            .navigationTitle("settings.vision.model".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -1083,6 +1083,21 @@ struct LiveAIProviderSettingsView: View {
                     Text("settings.liveai.provider.select".localized)
                 } footer: {
                     Text("settings.liveai.provider.description".localized)
+                }
+
+                Section {
+                    HStack {
+                        Text("settings.liveai.model".localized)
+                        Spacer()
+                        Text(providerManager.liveAIModel)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                            .multilineTextAlignment(.trailing)
+                    }
+                } header: {
+                    Text("settings.liveai.engine".localized)
+                } footer: {
+                    Text("settings.liveai.engine.description".localized)
                 }
 
                 // API Key status

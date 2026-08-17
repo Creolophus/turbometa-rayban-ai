@@ -158,3 +158,63 @@ class ViewModelIntegrationTests: XCTestCase {
     XCTAssertTrue([.stopped, .waiting].contains(viewModel.streamingStatus))
   }
 }
+
+final class LiveAIInputModeTests: XCTestCase {
+
+  func testInputModesProduceDifferentPromptConstraints() {
+    let basePrompt = LiveAIModeManager.staticSystemPrompt
+    let voicePrompt = LiveAIModeManager.staticSystemPrompt(inputMode: .voice)
+    let visionPrompt = LiveAIModeManager.staticSystemPrompt(inputMode: .vision)
+
+    XCTAssertTrue(voicePrompt.hasPrefix(basePrompt))
+    XCTAssertTrue(visionPrompt.hasPrefix(basePrompt))
+    XCTAssertNotEqual(voicePrompt, visionPrompt)
+    XCTAssertFalse(LiveAIInputMode.voice.systemPromptConstraint.isEmpty)
+    XCTAssertFalse(LiveAIInputMode.vision.systemPromptConstraint.isEmpty)
+  }
+
+  func testVoiceIsTheSafeDefaultAndMetadataRoundTrips() throws {
+    XCTAssertEqual(LiveAIInputMode.voice, LiveAIInputMode.allCases.first)
+
+    let record = ConversationRecord(
+      messages: [],
+      initialInputMode: .voice,
+      visionFrameCount: 0
+    )
+    let data = try JSONEncoder().encode(record)
+    let decoded = try JSONDecoder().decode(ConversationRecord.self, from: data)
+
+    XCTAssertEqual(decoded.initialInputMode, .voice)
+    XCTAssertEqual(decoded.visionFrameCount, 0)
+  }
+
+  func testConversationRecordDecodesLegacyPayloadWithoutLiveAIMetadata() throws {
+    let encoded = try JSONEncoder().encode(
+      ConversationRecord(messages: [], aiModel: "legacy-model", language: "zh-CN")
+    )
+    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    object.removeValue(forKey: "initialInputMode")
+    object.removeValue(forKey: "visionFrameCount")
+    let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+    let decoded = try JSONDecoder().decode(ConversationRecord.self, from: legacyData)
+    XCTAssertNil(decoded.initialInputMode)
+    XCTAssertNil(decoded.visionFrameCount)
+    XCTAssertEqual(decoded.aiModel, "legacy-model")
+  }
+
+  @MainActor
+  func testVoiceModeRejectsFramesAndVisionNeedsAStreamSource() async {
+    let viewModel = OmniRealtimeViewModel(apiKey: "", streamViewModel: nil)
+
+    XCTAssertEqual(viewModel.inputMode, .voice)
+    viewModel.updateVideoFrame(UIImage())
+    XCTAssertFalse(viewModel.canSendImages)
+
+    await viewModel.setInputMode(.vision)
+
+    XCTAssertEqual(viewModel.inputMode, .voice)
+    XCTAssertFalse(viewModel.canSendImages)
+    XCTAssertTrue(viewModel.showError)
+  }
+}

@@ -11,19 +11,29 @@ struct ConversationRecord: Identifiable, Codable {
     let messages: [ConversationMessage]
     let aiModel: String
     let language: String
+    /// Input mode selected when this Live AI session started. Optional so
+    /// records written by older app versions continue to decode.
+    let initialInputMode: LiveAIInputMode?
+    /// Number of still frames appended to the realtime session. Optional for
+    /// old records and for non-Live-AI records.
+    let visionFrameCount: Int?
 
     init(
         id: UUID = UUID(),
         timestamp: Date = Date(),
         messages: [ConversationMessage],
         aiModel: String = "qwen3-omni-flash-realtime",
-        language: String = "zh-CN"
+        language: String = "zh-CN",
+        initialInputMode: LiveAIInputMode? = nil,
+        visionFrameCount: Int? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
         self.messages = messages
         self.aiModel = aiModel
         self.language = language
+        self.initialInputMode = initialInputMode
+        self.visionFrameCount = visionFrameCount
     }
 
     // Computed properties

@@ -160,7 +160,10 @@ class GeminiLiveService: NSObject {
         guard !isSessionConfigured else { return }
 
         // 根据当前 Live AI 模式获取系统提示词
-        let instructions = LiveAIModeManager.staticSystemPrompt
+        // Every realtime session starts voice-only. The appended constraint
+        // remains valid if individual images arrive after an in-session mode
+        // switch, so Gemini does not need a second setup message.
+        let instructions = LiveAIModeManager.staticSystemPrompt(inputMode: .voice)
 
         // Gemini Live API setup message
         let setupMessage: [String: Any] = [
