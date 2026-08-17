@@ -163,7 +163,7 @@ class OpenClawCommandRouter {
                 "deviceType": .string("Ray-Ban Meta"),
                 "appName": .string("TurboMeta"),
                 "appVersion": .string("1.5.0"),
-                "sdkVersion": .string("0.5.0"),
+                "sdkVersion": .string("0.6.0"),
                 "platform": .string("iOS"),
                 "osVersion": .string(UIDevice.current.systemVersion)
             ],

@@ -46,6 +46,9 @@ android/local.properties
 *.mobileprovision
 *.dSYM/
 
+# Local Xcode credentials and signing configuration
+Config/Secrets.xcconfig
+
 # Signing tutorial images
 /
 

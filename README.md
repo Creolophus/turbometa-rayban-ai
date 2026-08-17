@@ -43,6 +43,7 @@
 
 - 🔗 **OpenClaw 集成**：将眼镜连接到 [OpenClaw](https://openclaw.ai) AI 助手，支持拍照发送、语音转录对话 👉 [使用教程](#-openclaw-集成)
 - 🕶️ **Meta Ray-Ban Display 支持**：新增对 Meta Ray-Ban Display 机型的支持（DAT SDK v0.5.0）
+- 🧩 **DAT SDK v0.6.0**：采用新的 DeviceSession 生命周期并增强 Mock 测试能力 👉 [升级说明](docs/meta-dat-sdk-0.6.0-migration.md)
 - 🎙️ **阿里云实时语音识别**：OpenClaw 聊天支持 Fun-ASR 语音转文字
 - 🛡️ **稳定性提升**：修复多个内存泄漏和线程安全问题
 
@@ -146,21 +147,15 @@
 3. 点击 **Projects** → **Create Project**，创建一个新项目
 4. 进入项目的 **App configuration** 页面
 5. 在 **Application ID integration** → **iOS integration** 部分，复制 `MetaAppID` 和 `ClientToken`
-6. 打开 `CameraAccess/Info.plist`，在 `MWDAT` 字典中填入你的值：
+6. 复制本地私密配置模板：
 
-```xml
-<key>MWDAT</key>
-<dict>
-    <key>AppLinkURLScheme</key>
-    <string>turbometa://</string>
-    <key>MetaAppID</key>
-    <string>你的MetaAppID</string>
-    <key>ClientToken</key>
-    <string>你的ClientToken</string>
-    <key>TeamID</key>
-    <string>$(DEVELOPMENT_TEAM)</string>
-</dict>
+```bash
+cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig
 ```
+
+7. 在 `Config/Secrets.xcconfig` 中填写 `META_APP_ID`、`CLIENT_TOKEN`、`DEVELOPMENT_TEAM` 和 `PRODUCT_BUNDLE_IDENTIFIER`
+
+> `Secrets.xcconfig` 已被 Git 忽略，真实凭据和签名信息不会提交到远端仓库。`CameraAccess/Info.plist` 会在构建时读取这些配置。
 
 #### 步骤 2：编译运行
 
@@ -291,10 +286,12 @@ TurboMeta 是专为 RayBan Meta 智能眼镜打造的全模态AI助手，集成�
 
 ## 🛠️ 技术栈
 
+> 准备二次开发？请先阅读 [iOS 工程功能拆解与二次开发指南](docs/ios-secondary-development-guide.md)。
+
 ### iOS
 - **平台**：iOS 17.0+
 - **语言**：Swift 5.0 + SwiftUI
-- **SDK**：Meta Wearables DAT SDK v0.5.0
+- **SDK**：Meta Wearables DAT SDK v0.6.0（[升级说明](docs/meta-dat-sdk-0.6.0-migration.md)）
 - **架构**：MVVM + Combine
 - **音频**：AVAudioEngine + AVAudioPlayerNode
 
@@ -684,7 +681,7 @@ Tailscale 会自动建立加密的点对点连接，无需开放公网端口。
 - [x] 实时翻译（18 种语言）
 - [x] **OpenClaw 集成** 🆕
 - [x] **Meta Ray-Ban Display 支持** 🆕
-- [x] **DAT SDK v0.5.0 升级** 🆕
+- [x] **DAT SDK v0.6.0 升级** 🆕
 - [x] **阿里云实时语音识别（Fun-ASR）** 🆕
 
 ### 🚧 进行中

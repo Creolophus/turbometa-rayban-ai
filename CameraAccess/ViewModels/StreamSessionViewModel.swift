@@ -27,6 +27,20 @@ enum StreamingStatus {
   case stopped
 }
 
+private enum SessionSetupError: LocalizedError {
+  case deviceSessionStopped
+  case streamUnavailable
+
+  var errorDescription: String? {
+    switch self {
+    case .deviceSessionStopped:
+      return "The device session stopped before it became ready."
+    case .streamUnavailable:
+      return "The camera stream is unavailable for this device."
+    }
+  }
+}
+
 @MainActor
 class StreamSessionViewModel: ObservableObject {
   @Published var currentVideoFrame: UIImage?
@@ -52,10 +66,12 @@ class StreamSessionViewModel: ObservableObject {
   @Published var showLeanEat: Bool = false
 
   private var timerTask: Task<Void, Never>?
-  // The core DAT SDK StreamSession - handles all streaming operations
-  // IMPORTANT: SDK requires ONE session instance, reused with start()/stop()
-  private var streamSession: StreamSession
+  // DAT 0.6 scopes camera streaming to an explicitly managed device session.
+  private var deviceSession: DeviceSession?
+  private var streamSession: StreamSession?
+  private let streamConfig: StreamSessionConfig
   // Listener tokens are used to manage DAT SDK event subscriptions
+  private var deviceSessionErrorListenerToken: AnyListenerToken?
   private var stateListenerToken: AnyListenerToken?
   private var videoFrameListenerToken: AnyListenerToken?
   private var errorListenerToken: AnyListenerToken?
@@ -84,13 +100,10 @@ class StreamSessionViewModel: ObservableObject {
     }
     logger.info("🟢 Using video quality: \(savedQuality) -> \(String(describing: resolution))")
 
-    // Create ONE session at init - SDK pattern requires reusing same session
-    let config = StreamSessionConfig(
+    streamConfig = StreamSessionConfig(
       videoCodec: VideoCodec.raw,
       resolution: resolution,
       frameRate: 24)
-    streamSession = StreamSession(streamSessionConfig: config, deviceSelector: deviceSelector)
-    logger.info("🟢 StreamSession created")
 
     // Monitor device availability
     deviceMonitorTask = Task { @MainActor in
@@ -100,7 +113,10 @@ class StreamSessionViewModel: ObservableObject {
       }
     }
 
-    // Subscribe to session state changes
+    logger.info("🟢 StreamSessionViewModel init complete")
+  }
+
+  private func configureStreamListeners(_ streamSession: StreamSession) {
     stateListenerToken = streamSession.statePublisher.listen { [weak self] state in
       Task { @MainActor [weak self] in
         logger.info("📊 State changed: \(String(describing: state))")
@@ -150,7 +166,6 @@ class StreamSessionViewModel: ObservableObject {
     }
 
     updateStatusFromState(streamSession.state)
-    logger.info("🟢 StreamSessionViewModel init complete")
   }
 
   func handleStartStreaming() async {
@@ -179,6 +194,15 @@ class StreamSessionViewModel: ObservableObject {
   func startSession() async {
     logger.info("🚀 startSession START")
 
+    if deviceSession != nil {
+      guard streamingStatus == .stopped else {
+        logger.info("🚀 A device session is already active")
+        return
+      }
+      // DeviceSession instances cannot be restarted after reaching .stopped.
+      await releaseSessionResources()
+    }
+
     // Reset to unlimited time when starting a new stream
     activeTimeLimit = .noLimit
     remainingTime = 0
@@ -187,9 +211,41 @@ class StreamSessionViewModel: ObservableObject {
     // Reset frame state
     hasReceivedFirstFrame = false
 
-    logger.info("🚀 Calling session.start()...")
-    await streamSession.start()
-    logger.info("🚀 startSession END - session.start() returned")
+    streamingStatus = .waiting
+
+    do {
+      let newDeviceSession = try wearables.createSession(deviceSelector: deviceSelector)
+      deviceSession = newDeviceSession
+      deviceSessionErrorListenerToken = newDeviceSession.errorPublisher.listen { [weak self] error in
+        Task { @MainActor [weak self] in
+          logger.error("❌ Device session error: \(String(describing: error))")
+          self?.showError(error.localizedDescription)
+        }
+      }
+
+      try newDeviceSession.start()
+      if newDeviceSession.state != .started {
+        for await state in newDeviceSession.stateStream() {
+          logger.info("📱 Device session state: \(String(describing: state))")
+          if state == .started { break }
+          if state == .stopped { throw SessionSetupError.deviceSessionStopped }
+        }
+      }
+
+      guard let newStreamSession = try newDeviceSession.addStream(config: streamConfig) else {
+        throw SessionSetupError.streamUnavailable
+      }
+      streamSession = newStreamSession
+      configureStreamListeners(newStreamSession)
+
+      logger.info("🚀 Calling stream.start()...")
+      await newStreamSession.start()
+      logger.info("🚀 startSession END - stream.start() returned")
+    } catch {
+      logger.error("❌ Session setup failed: \(error.localizedDescription)")
+      showError(error.localizedDescription)
+      await releaseSessionResources()
+    }
   }
 
   private func showError(_ message: String) {
@@ -200,7 +256,7 @@ class StreamSessionViewModel: ObservableObject {
   func stopSession() async {
     logger.info("⏹️ stopSession START")
     stopTimer()
-    await streamSession.stop()
+    await releaseSessionResources()
     logger.info("⏹️ stopSession END")
   }
 
@@ -221,7 +277,7 @@ class StreamSessionViewModel: ObservableObject {
   }
 
   func capturePhoto() {
-    streamSession.capturePhoto(format: .jpeg)
+    streamSession?.capturePhoto(format: .jpeg)
   }
 
   func dismissPhotoPreview() {
@@ -293,12 +349,24 @@ class StreamSessionViewModel: ObservableObject {
     stopTimer()
     deviceMonitorTask?.cancel()
     deviceMonitorTask = nil
-    await streamSession.stop()
-    // Clear listeners
+    await releaseSessionResources()
+    logger.info("🔴 cleanup END")
+  }
+
+  private func releaseSessionResources() async {
+    if let streamSession {
+      await streamSession.stop()
+    }
+    deviceSession?.stop()
+
     stateListenerToken = nil
     videoFrameListenerToken = nil
     errorListenerToken = nil
     photoDataListenerToken = nil
-    logger.info("🔴 cleanup END")
+    deviceSessionErrorListenerToken = nil
+    streamSession = nil
+    deviceSession = nil
+    currentVideoFrame = nil
+    streamingStatus = .stopped
   }
 }

@@ -41,6 +41,7 @@
 
 - 🔗 **OpenClaw Integration**: Connect your glasses to [OpenClaw](https://openclaw.ai) AI assistant — snap photos & voice chat 👉 [Setup Guide](#-openclaw-integration)
 - 🕶️ **Meta Ray-Ban Display Support**: Added support for Meta Ray-Ban Display glasses (DAT SDK v0.5.0)
+- 🧩 **DAT SDK v0.6.0**: Migrated to the DeviceSession lifecycle with enhanced mock testing support — [Migration notes](docs/meta-dat-sdk-0.6.0-migration.md)
 - 🎙️ **Real-time Speech Recognition**: OpenClaw chat supports Alibaba Fun-ASR voice-to-text
 - 🛡️ **Stability Improvements**: Fixed memory leaks and thread safety issues
 
@@ -143,21 +144,15 @@ Before using TurboMeta, you **MUST** enable DAT SDK Preview Mode in Meta View Ap
 3. Click **Projects** → **Create Project**
 4. Go to **App configuration** page
 5. Under **Application ID integration** → **iOS integration**, copy `MetaAppID` and `ClientToken`
-6. Open `CameraAccess/Info.plist` and fill in your values under `MWDAT`:
+6. Copy the local secrets configuration template:
 
-```xml
-<key>MWDAT</key>
-<dict>
-    <key>AppLinkURLScheme</key>
-    <string>turbometa://</string>
-    <key>MetaAppID</key>
-    <string>YOUR_META_APP_ID</string>
-    <key>ClientToken</key>
-    <string>YOUR_CLIENT_TOKEN</string>
-    <key>TeamID</key>
-    <string>$(DEVELOPMENT_TEAM)</string>
-</dict>
+```bash
+cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig
 ```
+
+7. Set `META_APP_ID`, `CLIENT_TOKEN`, `DEVELOPMENT_TEAM`, and `PRODUCT_BUNDLE_IDENTIFIER` in `Config/Secrets.xcconfig`
+
+> `Secrets.xcconfig` is ignored by Git, so credentials and signing settings stay local. `CameraAccess/Info.plist` reads these values at build time.
 
 #### Step 2: Build and Run
 
@@ -227,10 +222,12 @@ This is the world's first **fully Chinese-enabled** RayBan Meta AI assistant, br
 
 ## 🛠️ Tech Stack
 
+> Planning further development? Start with the [iOS architecture and secondary development guide](docs/ios-secondary-development-guide.md) (Chinese).
+
 ### iOS
 - **Platform**: iOS 17.0+
 - **Language**: Swift 5.0 + SwiftUI
-- **SDK**: Meta Wearables DAT SDK v0.5.0
+- **SDK**: Meta Wearables DAT SDK v0.6.0 ([migration notes](docs/meta-dat-sdk-0.6.0-migration.md))
 - **Architecture**: MVVM + Combine
 - **Audio**: AVAudioEngine + AVAudioPlayerNode
 

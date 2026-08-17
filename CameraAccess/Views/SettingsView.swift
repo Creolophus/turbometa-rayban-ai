@@ -335,7 +335,7 @@ struct SettingsView: View {
                 // 关于
                 Section {
                     InfoRow(title: "settings.version".localized, value: "2.0.0")
-                    InfoRow(title: "settings.sdkversion".localized, value: "0.5.0")
+                    InfoRow(title: "settings.sdkversion".localized, value: "0.6.0")
                 } header: {
                     Text("settings.about".localized)
                 }

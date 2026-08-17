@@ -1,0 +1,9 @@
+// Non-secret defaults shared by Debug and Release.
+// Local values are loaded from Secrets.xcconfig when that file exists.
+
+META_APP_ID =
+CLIENT_TOKEN =
+DEVELOPMENT_TEAM =
+PRODUCT_BUNDLE_IDENTIFIER =
+
+#include? "Secrets.xcconfig"
