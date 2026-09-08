@@ -1,743 +1,365 @@
-/*
- * Records View
- * 记录页面 - 包含各类记录的 Tab
- */
-
 import SwiftUI
 
-enum RecordCategory: Int, CaseIterable, Identifiable {
-    case liveAI
-    case translation
-    case audioNote
-    case leanEat
-    case wordLearn
-    case quickVision
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .liveAI:
-            return "Live AI"
-        case .translation:
-            return "livetranslate.title".localized
-        case .audioNote:
-            return "audioNote.records.tab".localized
-        case .leanEat:
-            return "LeanEat"
-        case .wordLearn:
-            return "WordLearn"
-        case .quickVision:
-            return "quickvision.tab".localized
-        }
-    }
-}
-
-struct RecordBatchDeleteRequest {
-    let category: RecordCategory
-    let ids: Set<UUID>
-}
-
-struct RecordSelectAllRequest {
-    let category: RecordCategory
-}
-
-enum RecordsLayout {
-    static let categoryBarHeight: CGFloat = 56
-    static let listTopInset = categoryBarHeight + AppSpacing.md
-    static let bottomContentPadding: CGFloat = 96
-}
-
-extension View {
-    /// Applies the top spacing needed for a records list below the floating category bar.
-    func recordsListTopSpacing() -> some View {
-        self
-            .safeAreaPadding(.top, RecordsLayout.listTopInset)
-            .padding(.top, RecordsLayout.listTopInset)
-    }
-}
-
-struct RecordListScrollOffsetPreferenceKey: PreferenceKey {
-    static let defaultValue: [Int: CGFloat] = [:]
-
-    static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
-        value.merge(nextValue(), uniquingKeysWith: { $1 })
-    }
-}
-
-struct RecordListScrollMarker: View {
-    let category: RecordCategory
-
-    var body: some View {
-        GeometryReader { geometry in
-            Color.clear
-                .preference(
-                    key: RecordListScrollOffsetPreferenceKey.self,
-                    value: [
-                        category.rawValue:
-                            geometry.frame(in: .named("recordsContent")).minY
-                            - RecordsLayout.categoryBarHeight
-                    ]
-                )
-        }
-        .frame(height: 0)
-    }
-}
-
-extension Notification.Name {
-    static let recordsBatchDeleteRequested = Notification.Name("recordsBatchDeleteRequested")
-    static let recordsSelectAllRequested = Notification.Name("recordsSelectAllRequested")
-}
-
 struct RecordsView: View {
-    // Keep the TabView selection as a stable integer. SwiftUI's page-style
-    // TabView can otherwise briefly resolve enum tags to the adjacent page
-    // during the first programmatic selection.
-    @State private var selectedCategoryIndex = RecordCategory.liveAI.rawValue
-    @State private var isSelectionMode = false
-    @State private var selectedRecordIDs = Set<UUID>()
-    @State private var showsBatchDeleteConfirmation = false
-    @State private var recordsScrollOffset: CGFloat = 0
+    @StateObject private var model: RecordsLibraryViewModel
+    @ObservedObject private var audioLibrary = AudioNoteLibrary.shared
+    @ObservedObject private var languageManager = LanguageManager.shared
+    @Environment(\.scenePhase) private var scenePhase
+    @FocusState private var searchFocused: Bool
+    @State private var detail: RecordEntry?
+    @State private var deletionIDs = Set<RecordEntryID>()
+    @State private var confirmsDeletion = false
 
-    private var selectedCategory: RecordCategory {
-        RecordCategory(rawValue: selectedCategoryIndex) ?? .liveAI
+    init(model: RecordsLibraryViewModel? = nil) {
+        _model = StateObject(wrappedValue: model ?? RecordsLibraryViewModel())
     }
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.black
-                    .ignoresSafeArea()
-
-                TabView(selection: $selectedCategoryIndex) {
-
-                    LiveAIRecordsView(
-                        isSelectionMode: $isSelectionMode,
-                        selectedIDs: $selectedRecordIDs
-                    )
-                        .tag(RecordCategory.liveAI.rawValue)
-
-                    TranslationRecordsView(
-                        isSelectionMode: $isSelectionMode,
-                        selectedIDs: $selectedRecordIDs
-                    )
-                        .tag(RecordCategory.translation.rawValue)
-
-                    AudioNoteRecordsView(
-                        isSelectionMode: $isSelectionMode,
-                        selectedIDs: $selectedRecordIDs
-                    )
-                        .tag(RecordCategory.audioNote.rawValue)
-
-                    LeanEatRecordsView()
-                        .tag(RecordCategory.leanEat.rawValue)
-
-                    WordLearnRecordsView()
-                        .tag(RecordCategory.wordLearn.rawValue)
-
-                    QuickVisionRecordsView(
-                        isSelectionMode: $isSelectionMode,
-                        selectedIDs: $selectedRecordIDs
-                    )
-                        .tag(RecordCategory.quickVision.rawValue)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .ignoresSafeArea(edges: .all)
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    ScrollViewReader { proxy in
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            GlassEffectContainer(spacing: AppSpacing.sm) {
-                                HStack(spacing: AppSpacing.sm) {
-                                    ForEach(RecordCategory.allCases) { category in
-                                        RecordTabButton(
-                                            title: category.title,
-                                            isSelected: selectedCategory == category
-                                        ) {
-                                            selectedCategoryIndex = category.rawValue
-                                        }
-                                        .id(category.rawValue)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, AppSpacing.md)
-                            .padding(.vertical, AppSpacing.sm)
-
-                        }
-                        .frame(height: RecordsLayout.categoryBarHeight)
-                        .onChange(of: selectedCategoryIndex) { _, rawValue in
-                            guard let category = RecordCategory(rawValue: rawValue) else { return }
-                            withAnimation(.snappy) {
-                                proxy.scrollTo(category.rawValue, anchor: .center)
-                            }
-                        }
-//                        .background {
-//                            if recordsScrollOffset < RecordsLayout.categoryBarHeight + AppSpacing.md {
-//                                Rectangle()
-//                                    .fill(.linearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom))
-//                            } else {
-//                                Color.clear
-//                            }
-//                        }
-//                        .overlay {
-//                            if recordsScrollOffset < RecordsLayout.categoryBarHeight + AppSpacing.md {
-//                                Rectangle()
-//                                    .fill(Color.white.opacity(0.08))
-//                                    .frame(height: 0.5)
-//                                    .frame(maxHeight: .infinity, alignment: .bottom)
-//                            }
-//                        }
-                    }
-
-                }
-                .coordinateSpace(name: "recordsContent")
-                .onPreferenceChange(RecordListScrollOffsetPreferenceKey.self) { offsets in
-                    recordsScrollOffset = offsets[selectedCategoryIndex] ?? 0
-                }
+            VStack(spacing: 0) {
+                header
+                searchField
+                    .padding(.top, 12)
+                filters
+                    .padding(.top, 14)
+                    .padding(.bottom, 8)
+                archive
             }
-            .navigationTitle("records.title".localized)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .tabBar)
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    if isSelectionMode {
-                        Button {
-                            NotificationCenter.default.post(
-                                name: .recordsSelectAllRequested,
-                                object: RecordSelectAllRequest(category: selectedCategory)
-                            )
-                        } label: {
-                            Label("records.selectAll".localized, systemImage: "checkmark.circle")
-                        }
-
-                        Button(role: .destructive) {
-                            showsBatchDeleteConfirmation = true
-                        } label: {
-                            Label("common.delete".localized, systemImage: "trash")
-                        }
-                        .disabled(selectedRecordIDs.isEmpty)
-
-                        Button("common.done".localized) {
-                            endSelectionMode()
-                        }
-                    } else {
-                        Button {
-                            isSelectionMode = true
-                        } label: {
-                            Label("records.select".localized, systemImage: "checkmark.circle")
-                        }
-                    }
-                }
+            .background(HomeStyle.background.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if model.isSelecting { selectionBar }
             }
-            .confirmationDialog(
-                "records.batchDelete.title".localized,
-                isPresented: $showsBatchDeleteConfirmation,
-                titleVisibility: .visible
-            ) {
+            .sheet(item: $detail, onDismiss: model.reload) { entry in
+                detailView(entry)
+            }
+            .confirmationDialog("records.delete.title".localized, isPresented: $confirmsDeletion, titleVisibility: .visible) {
                 Button("records.delete.confirm".localized, role: .destructive) {
-                    deleteSelectedRecords()
+                    model.delete(ids: deletionIDs)
+                    deletionIDs.removeAll()
                 }
-                Button("common.cancel".localized, role: .cancel) {}
+                Button("common.cancel".localized, role: .cancel) { deletionIDs.removeAll() }
             } message: {
-                Text("records.batchDelete.message".localized)
+                Text(String(format: "records.archive.delete.message".localized, deletionIDs.count))
             }
-            .onChange(of: selectedCategoryIndex) { _, _ in
-                endSelectionMode()
+            .alert("records.archive.delete.failed".localized, isPresented: $model.deletionFailed) {
+                Button("common.done".localized, role: .cancel) {}
             }
         }
-    }
-
-    private func endSelectionMode() {
-        isSelectionMode = false
-        selectedRecordIDs.removeAll()
-    }
-
-    private func deleteSelectedRecords() {
-        guard !selectedRecordIDs.isEmpty else { return }
-        NotificationCenter.default.post(
-            name: .recordsBatchDeleteRequested,
-            object: RecordBatchDeleteRequest(
-                category: selectedCategory,
-                ids: selectedRecordIDs
-            )
-        )
-        endSelectionMode()
-    }
-}
-
-// MARK: - Record Tab Button
-
-struct RecordTabButton: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(AppTypography.subheadline)
-                .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundStyle(isSelected ? AppColors.primary : AppColors.textSecondary)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-                .padding(.horizontal, AppSpacing.sm)
-//                .frame(minHeight: 40)
+        .tint(HomeStyle.coral)
+        .onAppear(perform: model.reload)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { model.reload() }
         }
-        .buttonStyle(
-            .glass(
-                Glass.regular
-                    .tint(isSelected ? AppColors.primary.opacity(0.2) : nil)
-                    .interactive()
-            )
-        )
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .onReceive(NotificationCenter.default.publisher(for: .recordsLibraryDidChange).receive(on: RunLoop.main)) { _ in model.reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .liveTranslateHistoryDidChange).receive(on: RunLoop.main)) { _ in model.reload() }
+        .onReceive(audioLibrary.$notes) { _ in model.reload() }
     }
-}
 
-// MARK: - Shared Record Card
-
-struct RecordCardMetadata: Identifiable {
-    let icon: String
-    let text: String
-
-    var id: String { "\(icon)-\(text)" }
-}
-
-struct RecordCardBadge {
-    let text: String
-    let color: Color
-}
-
-/// Shared visual language for the three implemented record categories.
-struct UnifiedRecordCard: View {
-    let icon: String
-    let tint: Color
-    let title: String
-    let summary: String
-    let metadata: [RecordCardMetadata]
-    var badge: RecordCardBadge?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            HStack(spacing: AppSpacing.sm) {
-                Image(systemName: icon)
-                    .foregroundColor(tint)
-                    .font(AppTypography.headline)
-
-                Text(title)
-                    .font(AppTypography.headline)
-                    .foregroundColor(AppColors.textPrimary)
-                    .lineLimit(1)
-
-                Spacer(minLength: AppSpacing.sm)
-
-                if let badge {
-                    Text(badge.text)
-                        .font(AppTypography.caption)
-                        .foregroundColor(badge.color)
-                        .padding(.horizontal, AppSpacing.sm)
-                        .padding(.vertical, AppSpacing.xs)
-                        .background(badge.color.opacity(0.13), in: Capsule())
-                }
-
-                Image(systemName: "chevron.right")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textTertiary)
-            }
-
-            if !summary.isEmpty {
-                Text(summary)
-                    .font(AppTypography.subheadline)
-                    .foregroundColor(AppColors.textSecondary)
-                    .lineLimit(2)
-            }
-
-            HStack(spacing: AppSpacing.md) {
-                ForEach(metadata) { item in
-                    Label(item.text, systemImage: item.icon)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-            }
-            .font(AppTypography.caption)
-            .foregroundColor(AppColors.textSecondary)
-        }
-        .padding(AppSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppColors.tertiaryBackground)
-        .cornerRadius(AppCornerRadius.lg)
-        .shadow(color: AppShadow.small(), radius: 4, x: 0, y: 2)
-    }
-}
-
-// MARK: - Live AI Records
-
-struct LiveAIRecordsView: View {
-    @Binding var isSelectionMode: Bool
-    @Binding var selectedIDs: Set<UUID>
-    @StateObject private var viewModel = ConversationListViewModel()
-    @State private var selectedConversation: ConversationRecord?
-    @State private var conversationPendingDeletion: ConversationRecord?
-    @State private var showsDeleteConfirmation = false
-
-    var body: some View {
-        ZStack {
-            Color.black
-                .ignoresSafeArea()
-
-            if viewModel.conversations.isEmpty {
-                // Empty state
-                VStack(spacing: AppSpacing.lg) {
-                    Image(systemName: "brain.head.profile")
-                        .font(.system(size: 64))
-                        .foregroundColor(AppColors.liveAI.opacity(0.6))
-
-                    Text("暂无 Live AI 对话记录")
-                        .font(AppTypography.title2)
-                        .foregroundColor(AppColors.textPrimary)
-
-                    Text("使用 Live AI 功能后记录将显示在这里")
-                        .font(AppTypography.subheadline)
-                        .foregroundColor(AppColors.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, AppSpacing.xl)
-                }
+    private var header: some View {
+        HStack {
+            Text("records.title".localized)
+                .font(.largeTitle.bold())
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            if model.isSelecting {
+                Button("common.done".localized) { model.endSelection() }
+                    .frame(minHeight: 44)
             } else {
-                // Conversation list
-                ScrollView {
-                    LazyVStack(spacing: AppSpacing.md) {
-                        RecordListScrollMarker(category: .liveAI)
+                Menu {
+                    Button {
+                        searchFocused = false
+                        model.isSelecting = true
+                    } label: {
+                        Label("records.select".localized, systemImage: "checkmark.circle")
+                    }
+                    .disabled(model.visibleEntries.isEmpty)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .modifier(RecordsGlassSurface())
+                }
+                .accessibilityLabel("records.archive.manage".localized)
+                .accessibilityIdentifier("records.manage")
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+    }
 
-                        ForEach(viewModel.conversations) { conversation in
-                            HStack(spacing: AppSpacing.sm) {
-                                if isSelectionMode {
-                                    RecordSelectionIndicator(isSelected: selectedIDs.contains(conversation.id))
-                                }
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("records.archive.search".localized, text: $model.query)
+                .font(.body)
+                .focused($searchFocused)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .accessibilityIdentifier("records.search")
+            if !model.query.isEmpty {
+                Button { model.query = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("records.archive.clearSearch".localized)
+            }
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, model.query.isEmpty ? 14 : 0)
+        .frame(minHeight: 44)
+        .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 18))
+        .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(.primary.opacity(0.06), lineWidth: 0.5) }
+        .padding(.horizontal, 20)
+    }
 
-                                ConversationCell(conversation: conversation)
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if isSelectionMode {
-                                    toggleSelection(for: conversation.id)
-                                } else {
-                                    selectedConversation = conversation
-                                }
-                            }
-                            .contextMenu {
-                                if !isSelectionMode {
-                                    Button(role: .destructive) {
-                                        conversationPendingDeletion = conversation
-                                        showsDeleteConfirmation = true
+    private var filters: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 4) {
+                    ForEach(RecordsFilter.allCases) { filter in
+                        Button {
+                            searchFocused = false
+                            model.filter = filter
+                        } label: {
+                            Text(filter.title)
+                                .font(.subheadline.weight(model.filter == filter ? .semibold : .regular))
+                                .foregroundStyle(model.filter == filter ? HomeStyle.coral : .primary)
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 44)
+                                .background(model.filter == filter ? HomeStyle.coral.opacity(0.12) : .clear, in: Capsule())
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(model.filter == filter ? .isSelected : [])
+                        .accessibilityIdentifier("records.filter.\(filter.rawValue)")
+                        .id(filter)
+                    }
+                }
+                .padding(3)
+                .background(.primary.opacity(0.035), in: Capsule())
+            }
+            .scrollIndicators(.hidden)
+            .onChange(of: model.filter) { _, filter in
+                withAnimation(.snappy) { proxy.scrollTo(filter, anchor: .center) }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var archive: some View {
+        ScrollView {
+            if model.filter.isComingSoon {
+                ContentUnavailableView {
+                    Label(model.filter.title, systemImage: model.filter == .leanEat ? "leaf" : "book.closed")
+                } description: {
+                    Text("records.comingSoon".localized)
+                }
+                .padding(.top, 40)
+            } else if model.visibleEntries.isEmpty {
+                ContentUnavailableView {
+                    Label(model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                          ? "records.empty".localized : "records.archive.noResults".localized,
+                          systemImage: model.query.isEmpty ? "tray" : "magnifyingglass")
+                } description: {
+                    Text(model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                         ? "records.archive.emptyHint".localized : "records.archive.searchHint".localized)
+                }
+                .padding(.top, 40)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 20) {
+                    ForEach(model.sections()) { section in
+                        VStack(alignment: .leading, spacing: 10) {
+                            dayHeader(section.date)
+                            VStack(spacing: 0) {
+                                ForEach(Array(section.entries.enumerated()), id: \.element.id) { index, entry in
+                                    Button {
+                                        searchFocused = false
+                                        if model.isSelecting { model.toggle(entry.id) }
+                                        else { detail = entry }
                                     } label: {
-                                        Label("common.delete".localized, systemImage: "trash")
+                                        RecordArchiveRow(entry: entry, isSelecting: model.isSelecting,
+                                                         isSelected: model.selectedIDs.contains(entry.id))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("records.row.\(entry.id.kind.rawValue).\(entry.id.value)")
+                                    .accessibilityAddTraits(model.selectedIDs.contains(entry.id) ? .isSelected : [])
+                                    .contextMenu {
+                                        if !model.isSelecting {
+                                            Button(role: .destructive) { confirmDeletion([entry.id]) } label: {
+                                                Label("common.delete".localized, systemImage: "trash")
+                                            }
+                                        }
+                                    }
+                                    if index < section.entries.count - 1 {
+                                        Divider().padding(.leading, model.isSelecting ? 106 : 82)
                                     }
                                 }
                             }
+                            .background(HomeStyle.card, in: RoundedRectangle(cornerRadius: 18))
+                            .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(.primary.opacity(0.065), lineWidth: 0.5) }
                         }
                     }
-                    .padding(.horizontal, AppSpacing.md)
-                    .padding(.bottom, RecordsLayout.bottomContentPadding)
                 }
-                .recordsListTopSpacing()
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 24)
+            }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
+        .refreshable { model.reload() }
+        .id(model.filter)
+    }
 
-                .refreshable {
-                    viewModel.loadConversations()
+    private func dayHeader(_ date: Date) -> some View {
+        let calendar = Calendar.current
+        let relative: String? = calendar.isDateInToday(date) ? "records.archive.today".localized
+            : calendar.isDateInYesterday(date) ? "records.archive.yesterday".localized : nil
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(relative ?? date.formatted(.dateTime.year().month().day().locale(languageManager.currentLanguage.locale)))
+                .font(.headline)
+            if relative != nil {
+                Text(date.formatted(.dateTime.month().day().locale(languageManager.currentLanguage.locale)))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private var selectionBar: some View {
+        VStack(spacing: 4) {
+            Text(String(format: "records.archive.selected".localized, model.selectedIDs.count))
+                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Button("records.selectAll".localized, action: model.selectAll)
+                    .frame(minHeight: 44)
+                Spacer()
+                Button(role: .destructive) { confirmDeletion(model.selectedIDs) } label: {
+                    Label("common.delete".localized, systemImage: "trash")
                 }
+                .disabled(model.selectedIDs.isEmpty)
+                .frame(minHeight: 44)
             }
         }
-//        .ignoresSafeArea(edges: .bottom)
-        .onAppear {
-            viewModel.loadConversations()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .recordsBatchDeleteRequested)) { notification in
-            guard let request = notification.object as? RecordBatchDeleteRequest,
-                  request.category == .liveAI else { return }
-            viewModel.deleteConversations(ids: request.ids)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .recordsSelectAllRequested)) { notification in
-            guard let request = notification.object as? RecordSelectAllRequest,
-                  request.category == .liveAI else { return }
-            selectedIDs.formUnion(viewModel.conversations.map(\.id))
-        }
-        .confirmationDialog(
-            "records.delete.title".localized,
-            isPresented: $showsDeleteConfirmation
-        ) {
-            Button("records.delete.confirm".localized, role: .destructive) {
-                guard let conversationPendingDeletion else { return }
-                viewModel.deleteConversation(conversationPendingDeletion.id)
-                self.conversationPendingDeletion = nil
-            }
-            Button("common.cancel".localized, role: .cancel) {
-                conversationPendingDeletion = nil
-            }
-        } message: {
-            Text("records.delete.message".localized)
-        }
-        .sheet(item: $selectedConversation) { conversation in
-            ConversationDetailView(conversation: conversation) {
-                viewModel.deleteConversation(conversation.id)
-                selectedConversation = nil
-            }
-        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .background(HomeStyle.background)
     }
 
-    private func toggleSelection(for id: UUID) {
-        if selectedIDs.contains(id) {
-            selectedIDs.remove(id)
-        } else {
-            selectedIDs.insert(id)
+    private func confirmDeletion(_ ids: Set<RecordEntryID>) {
+        deletionIDs = ids
+        confirmsDeletion = !ids.isEmpty
+    }
+
+    @ViewBuilder
+    private func detailView(_ entry: RecordEntry) -> some View {
+        switch entry {
+        case .liveAI(let record):
+            ConversationDetailView(conversation: record) { model.delete(ids: [entry.id]); detail = nil }
+        case .translation(let session):
+            TranslationSessionDetailView(session: session) { model.delete(ids: [entry.id]); detail = nil }
+        case .audioNote(let note):
+            AudioNoteDetailView(noteID: note.id) { model.reload(); detail = nil }
+        case .quickVision(let record):
+            QuickVisionRecordDetailView(record: record)
         }
     }
 }
 
-// MARK: - Conversation List ViewModel
-
-@MainActor
-class ConversationListViewModel: ObservableObject {
-    @Published var conversations: [ConversationRecord] = []
-
-    func loadConversations() {
-        conversations = ConversationStorage.shared.loadAllConversations()
-        print("📱 [RecordsView] 加载对话: \(conversations.count) 条")
-    }
-
-    func deleteConversation(_ id: UUID) {
-        ConversationStorage.shared.deleteConversation(id)
-        loadConversations()
-    }
-
-    func deleteConversations(ids: Set<UUID>) {
-        ids.forEach { ConversationStorage.shared.deleteConversation($0) }
-        loadConversations()
+private struct RecordsGlassSurface: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    func body(content: Content) -> some View {
+        if reduceTransparency { content.background(HomeStyle.card, in: Circle()) }
+        else { content.glassEffect(.regular.interactive(), in: Circle()) }
     }
 }
 
-// MARK: - Conversation Cell
-
-struct ConversationCell: View {
-    let conversation: ConversationRecord
-
-    var body: some View {
-        UnifiedRecordCard(
-            icon: "brain.head.profile",
-            tint: AppColors.liveAI,
-            title: conversation.title,
-            summary: conversation.summary,
-            metadata: [
-                RecordCardMetadata(icon: "clock", text: conversation.formattedDate),
-                RecordCardMetadata(
-                    icon: "bubble.left.and.bubble.right",
-                    text: String(format: "records.liveAI.messageCount".localized, conversation.messageCount)
-                )
-            ]
-        )
-    }
-}
-
-struct RecordSelectionIndicator: View {
+private struct RecordArchiveRow: View {
+    let entry: RecordEntry
+    let isSelecting: Bool
     let isSelected: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    var body: some View {
-        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .font(.title3)
-            .foregroundStyle(isSelected ? AppColors.primary : AppColors.textTertiary)
-            .frame(width: 28)
+    private var tint: Color {
+        switch entry.id.kind {
+        case .liveAI: return HomeStyle.coral
+        case .translation: return HomeStyle.violet
+        case .audioNote: return .orange
+        case .quickVision: return .teal
+        }
     }
-}
 
-// MARK: - Translation Records
-
-struct TranslationRecordsView: View {
-    @Binding var isSelectionMode: Bool
-    @Binding var selectedIDs: Set<UUID>
-    @StateObject private var viewModel = TranslationHistoryViewModel()
-    @State private var selectedSession: TranslationSession?
-    @State private var sessionPendingDeletion: TranslationSession?
-    @State private var showsDeleteConfirmation = false
+    private var icon: String {
+        switch entry.id.kind {
+        case .liveAI: return "bubble.left.and.text.bubble.right"
+        case .translation: return "character.bubble"
+        case .audioNote: return "waveform"
+        case .quickVision: return "eye"
+        }
+    }
 
     var body: some View {
-        Group {
-            if viewModel.sessions.isEmpty {
-                translationEmptyState
-                    .frame(maxWidth: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: AppSpacing.md) {
-                        RecordListScrollMarker(category: .translation)
-
-                        ForEach(viewModel.sessions) { session in
-                            HStack(spacing: AppSpacing.sm) {
-                                if isSelectionMode {
-                                    RecordSelectionIndicator(isSelected: selectedIDs.contains(session.id))
-                                }
-
-                                TranslationSessionCell(session: session)
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if isSelectionMode {
-                                    toggleSelection(for: session.id)
-                                } else {
-                                    selectedSession = session
-                                }
-                            }
-                            .contextMenu {
-                                if !isSelectionMode {
-                                    Button(role: .destructive) {
-                                        sessionPendingDeletion = session
-                                        showsDeleteConfirmation = true
-                                    } label: {
-                                        Label("common.delete".localized, systemImage: "trash")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, AppSpacing.md)
-                    .padding(.bottom, RecordsLayout.bottomContentPadding)
+        HStack(spacing: 12) {
+            if isSelecting {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3).foregroundStyle(isSelected ? HomeStyle.coral : .secondary)
+                    .accessibilityHidden(true)
+            }
+            artwork
+                .frame(width: dynamicTypeSize.isAccessibilitySize ? 40 : 54,
+                       height: dynamicTypeSize.isAccessibilitySize ? 40 : 54)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(entry.title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                if !entry.summary.isEmpty && entry.summary != entry.title {
+                    Text(entry.summary.replacingOccurrences(of: "\n", with: " "))
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+                }
+                Text(metadata)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if case .audioNote(let note) = entry, note.status != .completed {
+                    Text("audioNote.status.\(note.status.rawValue)".localized)
+                        .font(.caption2)
+                        .foregroundStyle(note.status == .failed ? Color.red : Color.secondary)
                 }
             }
-        }
-        .recordsListTopSpacing()
-
-        .background(Color.black.ignoresSafeArea())
-//        .ignoresSafeArea(edges: .bottom)
-        .refreshable {
-            viewModel.load()
-        }
-        .onAppear {
-            viewModel.load()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .liveTranslateHistoryDidChange)) { _ in
-            viewModel.load()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .recordsBatchDeleteRequested)) { notification in
-            guard let request = notification.object as? RecordBatchDeleteRequest,
-                  request.category == .translation else { return }
-            viewModel.deleteSessions(ids: request.ids)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .recordsSelectAllRequested)) { notification in
-            guard let request = notification.object as? RecordSelectAllRequest,
-                  request.category == .translation else { return }
-            selectedIDs.formUnion(viewModel.sessions.map(\.id))
-        }
-        .confirmationDialog(
-            "records.delete.title".localized,
-            isPresented: $showsDeleteConfirmation
-        ) {
-            Button("records.delete.confirm".localized, role: .destructive) {
-                guard let sessionPendingDeletion else { return }
-                viewModel.delete(session: sessionPendingDeletion)
-                self.sessionPendingDeletion = nil
-            }
-            Button("common.cancel".localized, role: .cancel) {
-                sessionPendingDeletion = nil
-            }
-        } message: {
-            Text("records.delete.message".localized)
-        }
-        .sheet(item: $selectedSession) { session in
-            TranslationSessionDetailView(session: session) {
-                viewModel.delete(session: session)
-                selectedSession = nil
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if !isSelecting {
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(minHeight: 88)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 
-    private var translationEmptyState: some View {
-        VStack(spacing: AppSpacing.lg) {
-            Image(systemName: "text.bubble")
-                .font(.system(size: 64))
-                .foregroundColor(AppColors.translate.opacity(0.6))
-
-            Text("records.translation.empty".localized)
-                .font(AppTypography.title2)
-                .foregroundColor(AppColors.textPrimary)
-
-            Text("records.translation.empty.hint".localized)
-                .font(AppTypography.subheadline)
-                .foregroundColor(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, AppSpacing.xl)
-        }
+    private var metadata: String {
+        ([entry.id.kind.title, entry.date.formatted(date: .omitted, time: .shortened)] + [entry.detailMetadata].compactMap { $0 })
+            .joined(separator: " · ")
     }
 
-    private func toggleSelection(for id: UUID) {
-        if selectedIDs.contains(id) {
-            selectedIDs.remove(id)
+    @ViewBuilder private var artwork: some View {
+        if case .quickVision(let record) = entry, let image = record.thumbnail {
+            Image(uiImage: image).resizable().scaledToFill()
         } else {
-            selectedIDs.insert(id)
+            RoundedRectangle(cornerRadius: 12)
+                .fill(tint.gradient)
+                .overlay { Image(systemName: icon).font(.system(size: 24, weight: .medium)).foregroundStyle(.white) }
         }
     }
 }
-
-// MARK: - Translation History View Model
-
-@MainActor
-final class TranslationHistoryViewModel: ObservableObject {
-    @Published private(set) var sessions: [TranslationSession] = []
-
-    private let storage: LiveTranslateHistoryStorage
-
-    init(storage: LiveTranslateHistoryStorage = .shared) {
-        self.storage = storage
-    }
-
-    func load() {
-        sessions = TranslationSessionBuilder.group(records: storage.loadAll())
-    }
-
-    func delete(session: TranslationSession) {
-        _ = storage.deleteRecords(ids: session.records.map(\.id))
-        load()
-    }
-
-    func deleteSessions(ids: Set<UUID>) {
-        let recordIDs = sessions
-            .filter { ids.contains($0.id) }
-            .flatMap { $0.records.map(\.id) }
-        _ = storage.deleteRecords(ids: recordIDs)
-        load()
-    }
-}
-
-// MARK: - Translation Session Cell
-
-struct TranslationSessionCell: View {
-    let session: TranslationSession
-
-    var body: some View {
-        UnifiedRecordCard(
-            icon: "text.bubble.fill",
-            tint: AppColors.translate,
-            title: directionText,
-            summary: session.previewText,
-            metadata: [
-                RecordCardMetadata(
-                    icon: "clock",
-                    text: session.startDate.formatted(date: .abbreviated, time: .shortened)
-                ),
-                RecordCardMetadata(
-                    icon: "text.quote",
-                    text: String(format: "records.translation.turnCount".localized, session.turnCount)
-                )
-            ]
-        )
-    }
-
-    private var directionText: String {
-        if session.hasMixedLanguageDirections {
-            return "records.translation.mixedDirection".localized
-        }
-        let directions = session.records.map {
-            "\($0.sourceLanguage.flag) \($0.sourceLanguage.displayName) → \($0.targetLanguage.flag) \($0.targetLanguage.displayName)"
-        }
-        return directions.first ?? ""
-    }
-}
-
-// MARK: - Translation Session Detail
 
 struct TranslationSessionDetailView: View {
     @Environment(\.dismiss) private var dismiss
@@ -860,220 +482,5 @@ private struct TranslationTurnDetailCell: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppColors.tertiaryBackground)
         .cornerRadius(AppCornerRadius.lg)
-    }
-}
-
-// MARK: - LeanEat Records
-
-struct LeanEatRecordsView: View {
-    var body: some View {
-        ZStack {
-            Color.black
-                .ignoresSafeArea()
-
-            VStack(spacing: AppSpacing.lg) {
-                Image(systemName: "chart.bar.fill")
-                    .font(.system(size: 64))
-                    .foregroundColor(AppColors.leanEat.opacity(0.6))
-
-                Text("暂无卡路里识别记录")
-                    .font(AppTypography.title2)
-                    .foregroundColor(AppColors.textPrimary)
-
-                Text("功能即将上线")
-                    .font(AppTypography.subheadline)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-        }
-        .ignoresSafeArea(edges: .bottom)
-    }
-}
-
-// MARK: - WordLearn Records
-
-struct WordLearnRecordsView: View {
-    var body: some View {
-        ZStack {
-            Color.black
-                .ignoresSafeArea()
-
-            VStack(spacing: AppSpacing.lg) {
-                Image(systemName: "book.closed.fill")
-                    .font(.system(size: 64))
-                    .foregroundColor(AppColors.wordLearn.opacity(0.6))
-
-                Text("暂无单词学习记录")
-                    .font(AppTypography.title2)
-                    .foregroundColor(AppColors.textPrimary)
-
-                Text("功能即将上线")
-                    .font(AppTypography.subheadline)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-        }
-        .ignoresSafeArea(edges: .bottom)
-    }
-}
-
-// MARK: - Quick Vision Records
-
-struct QuickVisionRecordsView: View {
-    @Binding var isSelectionMode: Bool
-    @Binding var selectedIDs: Set<UUID>
-    @State private var records: [QuickVisionRecord] = []
-    @State private var selectedRecord: QuickVisionRecord?
-
-    var body: some View {
-        ZStack {
-            Color.black
-                .ignoresSafeArea()
-
-            if records.isEmpty {
-                // Empty state
-                VStack(spacing: AppSpacing.lg) {
-                    Image(systemName: "eye.circle")
-                        .font(.system(size: 64))
-                        .foregroundColor(AppColors.quickVision.opacity(0.6))
-
-                    Text("quickvision.records.empty".localized)
-                        .font(AppTypography.title2)
-                        .foregroundColor(AppColors.textPrimary)
-
-                    Text("quickvision.records.empty.hint".localized)
-                        .font(AppTypography.subheadline)
-                        .foregroundColor(AppColors.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, AppSpacing.xl)
-                }
-            } else {
-                // Records list
-                ScrollView {
-                    LazyVStack(spacing: AppSpacing.md) {
-                        RecordListScrollMarker(category: .quickVision)
-
-                        ForEach(records) { record in
-                            HStack(spacing: AppSpacing.sm) {
-                                if isSelectionMode {
-                                    RecordSelectionIndicator(isSelected: selectedIDs.contains(record.id))
-                                }
-
-                                QuickVisionRecordCell(record: record)
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if isSelectionMode {
-                                    toggleSelection(for: record.id)
-                                } else {
-                                    selectedRecord = record
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, AppSpacing.md)
-                    .padding(.bottom, RecordsLayout.bottomContentPadding)
-                }
-                .refreshable {
-                    loadRecords()
-                }
-            }
-        }
-        .recordsListTopSpacing()
-
-        .ignoresSafeArea(edges: .bottom)
-        .onAppear {
-            loadRecords()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .recordsBatchDeleteRequested)) { notification in
-            guard let request = notification.object as? RecordBatchDeleteRequest,
-                  request.category == .quickVision else { return }
-            request.ids.forEach { QuickVisionStorage.shared.deleteRecord($0) }
-            loadRecords()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .recordsSelectAllRequested)) { notification in
-            guard let request = notification.object as? RecordSelectAllRequest,
-                  request.category == .quickVision else { return }
-            selectedIDs.formUnion(records.map(\.id))
-        }
-        .sheet(item: $selectedRecord) { record in
-            QuickVisionRecordDetailView(record: record)
-        }
-    }
-
-    private func loadRecords() {
-        records = QuickVisionStorage.shared.loadAllRecords()
-    }
-
-    private func toggleSelection(for id: UUID) {
-        if selectedIDs.contains(id) {
-            selectedIDs.remove(id)
-        } else {
-            selectedIDs.insert(id)
-        }
-    }
-}
-
-// MARK: - Quick Vision Record Cell
-
-struct QuickVisionRecordCell: View {
-    let record: QuickVisionRecord
-
-    var body: some View {
-        HStack(spacing: AppSpacing.md) {
-            // Thumbnail
-            if let thumbnail = record.thumbnail {
-                Image(uiImage: thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 70, height: 70)
-                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.md))
-            } else {
-                RoundedRectangle(cornerRadius: AppCornerRadius.md)
-                    .fill(Color.secondary.opacity(0.2))
-                    .frame(width: 70, height: 70)
-                    .overlay {
-                        Image(systemName: "photo")
-                            .foregroundColor(.secondary)
-                    }
-            }
-
-            VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                // Header
-                HStack {
-                    Image(systemName: record.mode.icon)
-                        .foregroundColor(AppColors.quickVision)
-                        .font(AppTypography.subheadline)
-
-                    Text(record.mode.displayName)
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.textPrimary)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textTertiary)
-                }
-
-                // Result summary
-                Text(record.summary)
-                    .font(AppTypography.subheadline)
-                    .foregroundColor(AppColors.textSecondary)
-                    .lineLimit(2)
-
-                // Footer
-                HStack(spacing: AppSpacing.xs) {
-                    Image(systemName: "clock")
-                        .font(AppTypography.caption)
-                    Text(record.formattedDate)
-                        .font(AppTypography.caption)
-                }
-                .foregroundColor(AppColors.textSecondary)
-            }
-        }
-        .padding(AppSpacing.md)
-        .background(AppColors.tertiaryBackground)
-        .cornerRadius(AppCornerRadius.lg)
-        .shadow(color: AppShadow.small(), radius: 4, x: 0, y: 2)
     }
 }

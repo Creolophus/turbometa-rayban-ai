@@ -49,6 +49,7 @@ class StreamSessionViewModel: ObservableObject {
   @Published var showError: Bool = false
   @Published var errorMessage: String = ""
   @Published var hasActiveDevice: Bool = false
+  @Published private(set) var connectedDevice: GlassesDeviceStatus = .disconnected
 
   var isStreaming: Bool {
     streamingStatus != .stopped
@@ -77,15 +78,23 @@ class StreamSessionViewModel: ObservableObject {
   private var errorListenerToken: AnyListenerToken?
   private var photoDataListenerToken: AnyListenerToken?
   private let wearables: WearablesInterface
-  private let deviceSelector: AutoDeviceSelector
+  private let deviceSelector: any DeviceSelector
+  private let deviceLookup: (DeviceIdentifier) -> (any GlassesDevice)?
+  private var deviceLinkListener: AnyListenerToken?
+  private var deviceStatusGeneration = UUID()
   private var deviceMonitorTask: Task<Void, Never>?
   private var isProcessingFrame = false
 
-  init(wearables: WearablesInterface) {
+  init(
+    wearables: WearablesInterface,
+    deviceSelector: (any DeviceSelector)? = nil,
+    deviceLookup: ((DeviceIdentifier) -> (any GlassesDevice)?)? = nil
+  ) {
     self.wearables = wearables
     logger.info("🟢 StreamSessionViewModel init")
     // Let the SDK auto-select from available devices
-    self.deviceSelector = AutoDeviceSelector(wearables: wearables)
+    self.deviceSelector = deviceSelector ?? AutoDeviceSelector(wearables: wearables)
+    self.deviceLookup = deviceLookup ?? { wearables.deviceForIdentifier($0) }
 
     // Get saved video quality setting from UserDefaults (only read at init)
     let savedQuality = UserDefaults.standard.string(forKey: "video_quality") ?? "medium"
@@ -106,14 +115,52 @@ class StreamSessionViewModel: ObservableObject {
       frameRate: 24)
 
     // Monitor device availability
-    deviceMonitorTask = Task { @MainActor in
-      for await device in deviceSelector.activeDeviceStream() {
+    refreshConnectedDevice()
+    let selector = self.deviceSelector
+    deviceMonitorTask = Task { @MainActor [weak self] in
+      for await device in selector.activeDeviceStream() {
+        guard let self, !Task.isCancelled else { return }
         logger.info("📱 Device changed: \(device != nil ? "connected" : "disconnected")")
         self.hasActiveDevice = device != nil
+        self.observeDevice(device)
       }
     }
 
     logger.info("🟢 StreamSessionViewModel init complete")
+  }
+
+  deinit {
+    deviceMonitorTask?.cancel()
+    if let token = deviceLinkListener {
+      Task { await token.cancel() }
+    }
+  }
+
+  /// Re-read the SDK name on foreground entry; the SDK has no name-change stream.
+  func refreshConnectedDevice() {
+    let identifier = deviceSelector.activeDevice
+    hasActiveDevice = identifier != nil
+    observeDevice(identifier)
+  }
+
+  private func observeDevice(_ identifier: DeviceIdentifier?) {
+    deviceStatusGeneration = UUID()
+    let generation = deviceStatusGeneration
+    if let previous = deviceLinkListener {
+      Task { await previous.cancel() }
+    }
+    deviceLinkListener = nil
+    guard let identifier, let device = deviceLookup(identifier) else {
+      connectedDevice = .disconnected
+      return
+    }
+    deviceLinkListener = device.addLinkStateListener { [weak self] state in
+      Task { @MainActor [weak self] in
+        guard let self, self.deviceStatusGeneration == generation else { return }
+        self.connectedDevice = GlassesDeviceStatus(identifier: identifier, name: device.name, linkState: state)
+      }
+    }
+    connectedDevice = GlassesDeviceStatus(identifier: identifier, name: device.name, linkState: device.linkState)
   }
 
   private func configureStreamListeners(_ streamSession: StreamSession) {
@@ -349,6 +396,12 @@ class StreamSessionViewModel: ObservableObject {
     stopTimer()
     deviceMonitorTask?.cancel()
     deviceMonitorTask = nil
+    deviceStatusGeneration = UUID()
+    let linkListener = deviceLinkListener
+    deviceLinkListener = nil
+    connectedDevice = .disconnected
+    hasActiveDevice = false
+    await linkListener?.cancel()
     await releaseSessionResources()
     logger.info("🔴 cleanup END")
   }

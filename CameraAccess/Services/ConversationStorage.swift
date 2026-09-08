@@ -30,6 +30,7 @@ class ConversationStorage {
         // Encode and save
         if let encoded = try? JSONEncoder().encode(conversations) {
             userDefaults.set(encoded, forKey: conversationsKey)
+            NotificationCenter.default.post(name: .recordsLibraryDidChange, object: nil)
             print("💾 [Storage] 保存对话成功: \(record.id), 总数: \(conversations.count)")
         } else {
             print("❌ [Storage] 保存对话失败")
@@ -68,12 +69,14 @@ class ConversationStorage {
 
         if let encoded = try? JSONEncoder().encode(conversations) {
             userDefaults.set(encoded, forKey: conversationsKey)
+            NotificationCenter.default.post(name: .recordsLibraryDidChange, object: nil)
             print("🗑️ [Storage] 删除对话成功: \(id)")
         }
     }
 
     func deleteAllConversations() {
         userDefaults.removeObject(forKey: conversationsKey)
+        NotificationCenter.default.post(name: .recordsLibraryDidChange, object: nil)
         print("🗑️ [Storage] 清空所有对话")
     }
 

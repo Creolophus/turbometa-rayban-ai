@@ -564,3 +564,40 @@
 "records.selectAll" = "Select All";
 "records.batchDelete.title" = "Delete selected records?";
 "records.batchDelete.message" = "The selected records will be permanently deleted and cannot be recovered.";
+
+// Liquid Glass home
+"home.settings.open" = "Open settings";
+"home.device.none" = "No glasses connected";
+"home.device.unnamed" = "Meta glasses";
+"home.device.connected" = "Connected";
+"home.device.connecting" = "Connecting";
+"home.device.disconnected" = "Disconnected";
+"home.hero.eyebrow" = "Just ask. Be there.";
+"home.hero.subtitle" = "Talk about what you see";
+"home.hero.start" = "Start talking";
+"home.assistants" = "Everyday essentials";
+"home.assistant.vision" = "Quick Vision";
+"home.assistant.notes" = "Voice Notes";
+"home.explore" = "Explore more";
+"home.explore.openclaw" = "Connect your AI assistant";
+"home.explore.live" = "Share your point of view";
+"home.explore.food" = "Discover what’s on your plate";
+
+// Records archive
+"records.filter.all" = "All";
+"records.filter.translation" = "Translation";
+"records.filter.notes" = "Notes";
+"records.filter.vision" = "Vision";
+"records.archive.search" = "Search records";
+"records.archive.clearSearch" = "Clear search";
+"records.archive.manage" = "Manage records";
+"records.archive.noResults" = "No matching records";
+"records.archive.emptyHint" = "Explore with your glasses. Your moments will appear here.";
+"records.archive.searchHint" = "Try another keyword or category.";
+"records.archive.today" = "Today";
+"records.archive.yesterday" = "Yesterday";
+"records.archive.selected" = "%d selected";
+"records.archive.delete.message" = "Permanently delete %d selected records? This cannot be undone.";
+"records.archive.delete.failed" = "Some records could not be deleted. Please try again.";
+
+"records.comingSoon" = "Coming soon";

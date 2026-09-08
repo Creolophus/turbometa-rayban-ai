@@ -9,6 +9,8 @@ struct MainTabView: View {
     @ObservedObject var streamViewModel: StreamSessionViewModel
     @ObservedObject var wearablesViewModel: WearablesViewModel
     @StateObject private var routeManager = AppRouteManager.shared
+    @ObservedObject private var languageManager = LanguageManager.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var selectedTab = 0
     @State private var showLiveAI = false
@@ -21,7 +23,9 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // Home - Feature entry
-            TurboMetaHomeView(streamViewModel: streamViewModel, wearablesViewModel: wearablesViewModel, apiKey: apiKey)
+            TurboMetaHomeView(streamViewModel: streamViewModel, wearablesViewModel: wearablesViewModel, apiKey: apiKey, onOpenSettings: {
+                selectedTab = 3
+            })
                 .tabItem {
                     Label("tab.home".localized, systemImage: "house.fill")
                 }
@@ -44,11 +48,16 @@ struct MainTabView: View {
             // Settings
             SettingsView(streamViewModel: streamViewModel, apiKey: apiKey)
                 .tabItem {
-                    Label("tab.settings".localized, systemImage: "person.fill")
+                    Label("tab.settings".localized, systemImage: "gearshape")
                 }
                 .tag(3)
         }
-        .accentColor(AppColors.primary)
+        .tint(HomeStyle.coral)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                streamViewModel.refreshConnectedDevice()
+            }
+        }
         .onAppear {
             // 先注入依赖：会话启动前 LiveAIManager 必须持有 streamViewModel，
             // 避免冷启动时视图生命周期顺序导致误报 notInitialized

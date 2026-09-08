@@ -81,7 +81,8 @@ struct StreamView: View {
     }
     .onDisappear {
       Task {
-        await viewModel.cleanup()
+        // This view shares the model with the home screen; keep device monitoring alive.
+        await viewModel.stopSession()
       }
     }
     // Show captured photos from DAT SDK in a preview sheet

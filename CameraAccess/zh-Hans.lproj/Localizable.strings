@@ -246,7 +246,7 @@
 "tab.home" = "首页";
 "tab.records" = "记录";
 "tab.gallery" = "图库";
-"tab.settings" = "我的";
+"tab.settings" = "设置";
 
 // MARK: - Errors
 "error.network" = "网络错误，请检查网络连接";
@@ -564,3 +564,40 @@
 "records.selectAll" = "全选";
 "records.batchDelete.title" = "删除选中的记录？";
 "records.batchDelete.message" = "选中的记录将被永久删除，且无法恢复。";
+
+// Liquid Glass home
+"home.settings.open" = "打开设置";
+"home.device.none" = "未连接眼镜";
+"home.device.unnamed" = "Meta 眼镜";
+"home.device.connected" = "已连接";
+"home.device.connecting" = "连接中";
+"home.device.disconnected" = "未连接";
+"home.hero.eyebrow" = "随时开口，即刻回应";
+"home.hero.subtitle" = "与你所见，实时对话";
+"home.hero.start" = "开始对话";
+"home.assistants" = "日常助手";
+"home.assistant.vision" = "快捷识图";
+"home.assistant.notes" = "语音笔记";
+"home.explore" = "更多探索";
+"home.explore.openclaw" = "连接你的 AI 助手";
+"home.explore.live" = "分享第一视角";
+"home.explore.food" = "看见食物，了解营养";
+
+// Records archive
+"records.filter.all" = "全部";
+"records.filter.translation" = "翻译";
+"records.filter.notes" = "笔记";
+"records.filter.vision" = "识图";
+"records.archive.search" = "搜索记录";
+"records.archive.clearSearch" = "清除搜索";
+"records.archive.manage" = "管理记录";
+"records.archive.noResults" = "没有找到相关记录";
+"records.archive.emptyHint" = "与眼镜一起探索，精彩时刻会留在这里";
+"records.archive.searchHint" = "试试其他关键词或分类";
+"records.archive.today" = "今天";
+"records.archive.yesterday" = "昨天";
+"records.archive.selected" = "已选择 %d 条";
+"records.archive.delete.message" = "将永久删除所选的 %d 条记录，此操作无法撤销。";
+"records.archive.delete.failed" = "部分记录未能删除，请重试";
+
+"records.comingSoon" = "待开发";

@@ -30,6 +30,7 @@ class QuickVisionStorage {
         // Encode and save
         if let encoded = try? JSONEncoder().encode(records) {
             userDefaults.set(encoded, forKey: recordsKey)
+            NotificationCenter.default.post(name: .recordsLibraryDidChange, object: nil)
             print("💾 [QuickVisionStorage] 保存记录成功: \(record.id), 总数: \(records.count)")
         } else {
             print("❌ [QuickVisionStorage] 保存记录失败")
@@ -65,12 +66,14 @@ class QuickVisionStorage {
 
         if let encoded = try? JSONEncoder().encode(records) {
             userDefaults.set(encoded, forKey: recordsKey)
+            NotificationCenter.default.post(name: .recordsLibraryDidChange, object: nil)
             print("🗑️ [QuickVisionStorage] 删除记录成功: \(id)")
         }
     }
 
     func deleteAllRecords() {
         userDefaults.removeObject(forKey: recordsKey)
+        NotificationCenter.default.post(name: .recordsLibraryDidChange, object: nil)
         print("🗑️ [QuickVisionStorage] 清空所有记录")
     }
 

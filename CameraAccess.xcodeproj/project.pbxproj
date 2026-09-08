@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F02609080000000000000012 /* RecordsLibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609080000000000000002; };
+		F02609080000000000000011 /* RecordEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609080000000000000001; };
+		F02609070000000000000022 /* HomeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609070000000000000021 /* HomeDashboardView.swift */; };
+		F02609070000000000000012 /* GlassesDeviceStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609070000000000000011 /* GlassesDeviceStatus.swift */; };
 		05043536CDB06C0B88B3C4D9 /* TTSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 069172850B30A2766C8BD4B5 /* TTSService.swift */; };
 		217BDD58A35C2D24403F74BF /* APIProviderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1111827A1CF7A278A6DC6934 /* APIProviderManager.swift */; };
 		26664DE8308E3F2981609421 /* QuickVisionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA3E36CE337855A7F17F2AC8 /* QuickVisionService.swift */; };
@@ -130,6 +134,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F02609080000000000000002 /* RecordsLibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsLibraryViewModel.swift; sourceTree = "<group>"; };
+		F02609080000000000000001 /* RecordEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordEntry.swift; sourceTree = "<group>"; };
+		F02609070000000000000021 /* HomeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDashboardView.swift; sourceTree = "<group>"; };
+		F02609070000000000000011 /* GlassesDeviceStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassesDeviceStatus.swift; sourceTree = "<group>"; };
 		0080AFEB87FC4CF85E53FE97 /* LanguageManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LanguageManager.swift; path = Managers/LanguageManager.swift; sourceTree = "<group>"; };
 		069172850B30A2766C8BD4B5 /* TTSService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TTSService.swift; sourceTree = "<group>"; };
 		1111827A1CF7A278A6DC6934 /* APIProviderManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = APIProviderManager.swift; path = Managers/APIProviderManager.swift; sourceTree = "<group>"; };
@@ -283,6 +291,8 @@
 		4BA57A8C2EF8227E002EC214 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				F02609080000000000000001 /* RecordEntry.swift */,
+				F02609070000000000000011 /* GlassesDeviceStatus.swift */,
 				AN1001000000000001 /* AudioNoteModels.swift */,
 				4BB5DFEE2F06C05E00AF7BD0 /* LiveAIModels.swift */,
 				4BA57A8A2EF8227E002EC214 /* ConversationRecord.swift */,
@@ -346,6 +356,7 @@
 		4BA57AA12EF8227E002EC214 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				F02609080000000000000002 /* RecordsLibraryViewModel.swift */,
 				AN1005000000000005 /* AudioNoteViewModel.swift */,
 				4B69CCC42F050D5200D1D025 /* RTMPStreamingViewModel.swift */,
 				4BA57A9A2EF8227E002EC214 /* MockDeviceKit */,
@@ -385,6 +396,7 @@
 		4BA57ABF2EF8227E002EC214 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				F02609070000000000000021 /* HomeDashboardView.swift */,
 				AN1006000000000006 /* AudioNoteView.swift */,
 				AN1007000000000007 /* AudioNoteRecordsView.swift */,
 				AN1008000000000008 /* AudioNoteSettingsView.swift */,
@@ -607,6 +619,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F02609080000000000000012 /* RecordsLibraryViewModel.swift in Sources */,
+				F02609080000000000000011 /* RecordEntry.swift in Sources */,
+				F02609070000000000000022 /* HomeDashboardView.swift in Sources */,
+				F02609070000000000000012 /* GlassesDeviceStatus.swift in Sources */,
 				AN2001000000000001 /* AudioNoteModels.swift in Sources */,
 				AN2002000000000002 /* AudioNoteStorage.swift in Sources */,
 				AN2003000000000003 /* AudioNoteRecorder.swift in Sources */,
