@@ -9,12 +9,8 @@ struct WayfarerPose: Equatable {
 
     mutating func constrain() {
         yaw = yaw.truncatingRemainder(dividingBy: 2 * .pi)
-        pitch = min(.pi * 75 / 180, max(-.pi * 75 / 180, pitch))
+        pitch = pitch.truncatingRemainder(dividingBy: 2 * .pi)
         scale = min(2.5, max(0.7, scale))
-    }
-
-    static func acceptsHorizontal(_ translation: CGPoint) -> Bool {
-        abs(translation.x) > 8 && abs(translation.x) > abs(translation.y) * 1.2
     }
 }
 
@@ -152,7 +148,8 @@ private struct WayfarerRenderer: UIViewRepresentable {
         view.renderer.scene.anchors.removeAll()
     }
 
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+    @MainActor
+    final class Coordinator: NSObject {
         var parent: WayfarerRenderer
         let pivot = Entity()
         var load: AnyCancellable?
@@ -205,7 +202,6 @@ private struct WayfarerRenderer: UIViewRepresentable {
             }
             let pan = UIPanGestureRecognizer(target: self, action: #selector(drag(_:)))
             pan.maximumNumberOfTouches = 1
-            pan.delegate = self
             view.addGestureRecognizer(pan)
             if !parent.fullscreen, let modelView = view as? WayfarerARView {
                 modelView.rotationPan = pan
@@ -263,15 +259,11 @@ private struct WayfarerRenderer: UIViewRepresentable {
             snapshotWork = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
         }
-        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
-            guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
-            return parent.fullscreen || WayfarerPose.acceptsHorizontal(pan.translation(in: pan.view))
-        }
         @objc func drag(_ pan: UIPanGestureRecognizer) {
             if pan.state == .began { start = parent.pose }
             let delta = pan.translation(in: pan.view)
             parent.pose.yaw = start.yaw + Float(delta.x) * 0.012
-            if parent.fullscreen { parent.pose.pitch = start.pitch + Float(delta.y) * 0.008 }
+            parent.pose.pitch = start.pitch + Float(delta.y) * 0.008
             parent.pose.constrain()
             applyPose()
         }
@@ -285,9 +277,8 @@ private struct WayfarerRenderer: UIViewRepresentable {
     }
 }
 
-/// Give the directional model recognizer the first decision. A vertical drag fails
-/// it immediately, then the enclosing scroll view can proceed with the same touch.
-/// A horizontal drag keeps the scroll recognizer waiting until rotation ends.
+/// Give the model recognizer priority for every drag that begins inside the model.
+/// Drags beginning elsewhere continue to be handled normally by the scroll view.
 private final class WayfarerARView: ARView {
     weak var rotationPan: UIPanGestureRecognizer?
     private weak var coordinatedScroll: UIScrollView?

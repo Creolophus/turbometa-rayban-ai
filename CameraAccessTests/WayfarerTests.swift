@@ -5,19 +5,15 @@ import RealityKit
 
 @MainActor
 final class WayfarerTests: XCTestCase {
-    func testPoseBoundsAndDirection() {
+    func testPoseWrapsAllRotationAxesAndConstrainsScale() {
         var pose = WayfarerPose(yaw: 100, pitch: 10, scale: 9)
         pose.constrain()
         XCTAssertLessThan(abs(pose.yaw), 2 * .pi)
-        XCTAssertEqual(pose.pitch, .pi * 75 / 180, accuracy: 0.0001)
+        XCTAssertLessThan(abs(pose.pitch), 2 * .pi)
         XCTAssertEqual(pose.scale, 2.5)
         pose.scale = -1; pose.pitch = -10; pose.constrain()
         XCTAssertEqual(pose.scale, 0.7)
-        XCTAssertEqual(pose.pitch, -.pi * 75 / 180, accuracy: 0.0001)
-        XCTAssertFalse(WayfarerPose.acceptsHorizontal(CGPoint(x: 7, y: 0)))
-        XCTAssertFalse(WayfarerPose.acceptsHorizontal(CGPoint(x: 20, y: 30)))
-        XCTAssertFalse(WayfarerPose.acceptsHorizontal(CGPoint(x: 12, y: 10)))
-        XCTAssertTrue(WayfarerPose.acceptsHorizontal(CGPoint(x: -30, y: 10)))
+        XCTAssertLessThan(abs(pose.pitch), 2 * .pi)
     }
 
     func testModelViews() async throws {
