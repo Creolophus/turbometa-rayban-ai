@@ -17,3 +17,12 @@ Implemented 2026-09-08. Records now opens a combined chronological archive, with
 ## Remaining device verification
 
 After reconnecting the authorized iPhone 17 Pro, the latest signed build (including LeanEat and WordLearn placeholders) was installed successfully on 2026-09-08. Automatic launch was denied because the phone was locked. Unlock and open TurboMeta to verify real-record detail navigation, media playback and confirmed deletion. These interactions were preserved in code but were not manually exercised on personal data. Small-screen hardware, VoiceOver speech and Reduce Transparency device checks remain unverified for this tab.
+
+
+## Fixed glass filters (2026-09-08)
+
+The archive now scrolls behind a fixed native regular-glass capsule below search. The capsule belongs to the horizontal viewport, so the glass stays fixed while its seven filter buttons scroll. Measured filter height drives top scroll-content margins, including Dynamic Type. A 12pt top fade softens the content boundary without letting records draw over search. Reduce Transparency uses an opaque card background.
+
+Simulator appearance tests passed for light/dark, English, largest Dynamic Type, selection, empty archive, search and both coming-soon pages. Scroll checks cover initial position, 150pt overlap, bottom and return to top. Reduce Transparency was enabled through device settings, verified by XCTest and restored to off afterward. Screenshots are in `screenshots/records-liquid-glass/filters/`; fixture records remain test-only. Results: `/tmp/records-glass-final.xcresult` and `/tmp/records-glass-reduced.xcresult`. Signed device build passed (`/tmp/records-glass-device-final.log`).
+
+After reconnection, this follow-up was built and installed successfully on the physical iPhone 17 Pro (`/tmp/records-glass-phone-build.log`). The subsequent launch attempt returned CoreDevice 4016 because connectivity became unavailable. Actual touch-gesture arbitration and device visual checks remain pending; automated screenshots exercise layout and programmatic scrolling, not finger gestures. The installed app can be opened manually.

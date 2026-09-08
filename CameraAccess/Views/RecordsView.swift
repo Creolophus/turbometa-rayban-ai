@@ -9,6 +9,8 @@ struct RecordsView: View {
     @State private var detail: RecordEntry?
     @State private var deletionIDs = Set<RecordEntryID>()
     @State private var confirmsDeletion = false
+    @State private var filterBarHeight: CGFloat = 0
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     init(model: RecordsLibraryViewModel? = nil) {
         _model = StateObject(wrappedValue: model ?? RecordsLibraryViewModel())
@@ -20,10 +22,21 @@ struct RecordsView: View {
                 header
                 searchField
                     .padding(.top, 12)
-                filters
-                    .padding(.top, 14)
-                    .padding(.bottom, 8)
                 archive
+                    .contentMargins(.top, filterBarHeight + 8, for: .scrollContent)
+                    .mask {
+                        VStack(spacing: 0) {
+                            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 12)
+                            Rectangle()
+                        }
+                        .ignoresSafeArea(edges: .bottom)
+                    }
+                    .overlay(alignment: .top) {
+                        filters
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { filterBarHeight = $0 }
+                    }
+                    .padding(.top, 14)
             }
             .background(HomeStyle.background.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
@@ -139,9 +152,11 @@ struct RecordsView: View {
                     }
                 }
                 .padding(3)
-                .background(.primary.opacity(0.035), in: Capsule())
             }
             .scrollIndicators(.hidden)
+            .fixedSize(horizontal: false, vertical: true)
+            .clipShape(Capsule())
+            .modifier(RecordsFilterGlassSurface(reduceTransparency: reduceTransparency))
             .onChange(of: model.filter) { _, filter in
                 withAnimation(.snappy) { proxy.scrollTo(filter, anchor: .center) }
             }
@@ -265,6 +280,18 @@ struct RecordsView: View {
             AudioNoteDetailView(noteID: note.id) { model.reload(); detail = nil }
         case .quickVision(let record):
             QuickVisionRecordDetailView(record: record)
+        }
+    }
+}
+
+private struct RecordsFilterGlassSurface: ViewModifier {
+    let reduceTransparency: Bool
+
+    func body(content: Content) -> some View {
+        if reduceTransparency {
+            content.background(HomeStyle.card, in: Capsule())
+        } else {
+            content.glassEffect(.regular, in: Capsule())
         }
     }
 }
