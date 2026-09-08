@@ -601,3 +601,15 @@
 "records.archive.delete.failed" = "Some records could not be deleted. Please try again.";
 
 "records.comingSoon" = "Coming soon";
+
+// Live AI dashboard
+"liveai.dashboard.listening" = "Listening";
+"liveai.dashboard.switching" = "Switching input mode…";
+"liveai.dashboard.waitingCamera" = "Waiting for the glasses camera…";
+"liveai.dashboard.hint" = "Start speaking whenever you’re ready.";
+"liveai.dashboard.hidden" = "Conversation hidden";
+"liveai.dashboard.hide" = "Hide chat";
+"liveai.dashboard.show" = "Show chat";
+"liveai.dashboard.end" = "End";
+"liveai.dashboard.voice" = "Voice";
+"liveai.dashboard.vision" = "Vision";

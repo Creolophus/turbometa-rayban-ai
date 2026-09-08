@@ -601,3 +601,15 @@
 "records.archive.delete.failed" = "部分记录未能删除，请重试";
 
 "records.comingSoon" = "待开发";
+
+// Live AI dashboard
+"liveai.dashboard.listening" = "正在聆听";
+"liveai.dashboard.switching" = "正在切换输入模式…";
+"liveai.dashboard.waitingCamera" = "正在等待眼镜画面…";
+"liveai.dashboard.hint" = "随时开口，聊聊你眼前的世界";
+"liveai.dashboard.hidden" = "对话内容已隐藏";
+"liveai.dashboard.hide" = "隐藏对话";
+"liveai.dashboard.show" = "显示对话";
+"liveai.dashboard.end" = "结束";
+"liveai.dashboard.voice" = "语音";
+"liveai.dashboard.vision" = "视觉";
