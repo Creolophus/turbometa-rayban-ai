@@ -613,3 +613,15 @@
 "liveai.dashboard.end" = "End";
 "liveai.dashboard.voice" = "Voice";
 "liveai.dashboard.vision" = "Vision";
+
+// Interactive glasses
+"glasses.model.description" = "Shiny black Wayfarer glasses with green lenses";
+"glasses.model.hint" = "Drag horizontally to rotate. Double tap to expand.";
+"glasses.rotate.left" = "Rotate left";
+"glasses.rotate.right" = "Rotate right";
+"glasses.reset" = "Reset";
+"glasses.expand" = "Expand glasses";
+"glasses.zoom.in" = "Zoom in";
+"glasses.zoom.out" = "Zoom out";
+"glasses.close" = "Close";
+"glasses.fullscreen.hint" = "Drag to rotate · Pinch to zoom";

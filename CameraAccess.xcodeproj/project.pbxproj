@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+ F026090800000000000000A1 = {isa = PBXBuildFile; fileRef = F026090800000000000000A2; };
+ F026090800000000000000A3 = {isa = PBXBuildFile; fileRef = F026090800000000000000A4; };
 		F02609080000000000000012 /* RecordsLibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609080000000000000002; };
 		F02609080000000000000011 /* RecordEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609080000000000000001; };
 		F02609070000000000000022 /* HomeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609070000000000000021 /* HomeDashboardView.swift */; };
@@ -134,6 +136,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+ F026090800000000000000A2 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WayfarerView.swift; sourceTree = "<group>"; };
+ F026090800000000000000A4 = {isa = PBXFileReference; lastKnownFileType = file; name = Wayfarer.usdz; path = CameraAccess/Resources/Models/Wayfarer.usdz; sourceTree = SOURCE_ROOT; };
 		F02609080000000000000002 /* RecordsLibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsLibraryViewModel.swift; sourceTree = "<group>"; };
 		F02609080000000000000001 /* RecordEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordEntry.swift; sourceTree = "<group>"; };
 		F02609070000000000000021 /* HomeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDashboardView.swift; sourceTree = "<group>"; };
@@ -397,6 +401,8 @@
 			isa = PBXGroup;
 			children = (
 				F02609070000000000000021 /* HomeDashboardView.swift */,
+ F026090800000000000000A2,
+ F026090800000000000000A4,
 				AN1006000000000006 /* AudioNoteView.swift */,
 				AN1007000000000007 /* AudioNoteRecordsView.swift */,
 				AN1008000000000008 /* AudioNoteSettingsView.swift */,
@@ -599,6 +605,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+ F026090800000000000000A3,
 				4BA57AF02EF8227E002EC214 /* Localizable.strings in Resources */,
 				4BA57AF12EF8227E002EC214 /* Localizable.strings in Resources */,
 				8FD96B8D2E6F0A9800F56AB1 /* Assets.xcassets in Resources */,
@@ -622,6 +629,7 @@
 				F02609080000000000000012 /* RecordsLibraryViewModel.swift in Sources */,
 				F02609080000000000000011 /* RecordEntry.swift in Sources */,
 				F02609070000000000000022 /* HomeDashboardView.swift in Sources */,
+ F026090800000000000000A1,
 				F02609070000000000000012 /* GlassesDeviceStatus.swift in Sources */,
 				AN2001000000000001 /* AudioNoteModels.swift in Sources */,
 				AN2002000000000002 /* AudioNoteStorage.swift in Sources */,

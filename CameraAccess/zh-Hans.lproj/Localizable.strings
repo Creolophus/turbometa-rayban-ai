@@ -613,3 +613,15 @@
 "liveai.dashboard.end" = "结束";
 "liveai.dashboard.voice" = "语音";
 "liveai.dashboard.vision" = "视觉";
+
+// Interactive glasses
+"glasses.model.description" = "亮黑框深绿镜片 Wayfarer 眼镜";
+"glasses.model.hint" = "横向拖动旋转，轻点放大查看";
+"glasses.rotate.left" = "向左旋转";
+"glasses.rotate.right" = "向右旋转";
+"glasses.reset" = "重置";
+"glasses.expand" = "放大眼镜";
+"glasses.zoom.in" = "放大";
+"glasses.zoom.out" = "缩小";
+"glasses.close" = "关闭";
+"glasses.fullscreen.hint" = "拖动旋转 · 双指缩放";

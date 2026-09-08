@@ -27,6 +27,12 @@ struct HomeDashboardView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorScheme) private var colorScheme
 
+    @State private var modelPose = WayfarerPose()
+    @State private var modelReady = false
+    @State private var showingModel = false
+    @State private var heroVisible = true
+    @State private var scrolling = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -41,6 +47,7 @@ struct HomeDashboardView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+        .onScrollPhaseChange { _, phase in scrolling = phase == .interacting || phase == .decelerating || phase == .animating }
         .background(HomeStyle.background.ignoresSafeArea())
     }
 
@@ -101,47 +108,35 @@ struct HomeDashboardView: View {
     }
 
     private var hero: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 0) {
-                    Image("HomeGlassesHero")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .accessibilityHidden(true)
-                    heroCopy.padding(20)
-                }
-                .background(Color(red: 0.97, green: 0.78, blue: 0.74))
-            } else {
-                HStack {
-                    heroCopy
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Spacer(minLength: 0)
-                        .frame(maxWidth: .infinity)
-                }
-                .padding(18)
-                .frame(minHeight: 210)
-                .background {
-                    GeometryReader { geometry in
-                        Image("HomeGlassesHero")
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                            .clipped()
-                    }
-                    LinearGradient(
-                        stops: [
-                            .init(color: Color(red: 0.98, green: 0.79, blue: 0.75).opacity(0.65), location: 0),
-                            .init(color: .clear, location: 0.62)
-                        ],
-                        startPoint: .leading, endPoint: .trailing
-                    )
-                }
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+        return layout {
+            if !dynamicTypeSize.isAccessibilitySize {
+                heroCopy.padding(.leading, 18).padding(.vertical, 18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            WayfarerSurface(pose: $modelPose, ready: $modelReady, drawsBackground: false, scrolling: scrolling, active: heroVisible && !showingModel) { showingModel = true }
+                .frame(maxWidth: .infinity).frame(height: 210)
+                .overlay(alignment: .bottomTrailing) {
+                    Button { showingModel = true } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .frame(width: 40, height: 40)
+                    }
+                    .buttonStyle(.plain)
+                    .modifier(HomeGlassControl(shape: Circle(), opaqueColor: .white))
+                    .accessibilityLabel("glasses.expand".localized)
+                    .padding(10)
+                }
+            if dynamicTypeSize.isAccessibilitySize { heroCopy.padding(20) }
+        }
+        .background {
+            Image(modelReady ? "HomeGlassesBackdrop" : "HomeGlassesHero").resizable().scaledToFill()
         }
         .foregroundStyle(Color.black.opacity(0.88))
         .environment(\.colorScheme, .light)
         .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.12 : 0.06), radius: 8, y: 4)
+        .onScrollVisibilityChange(threshold: 0.01) { heroVisible = $0 }
+        .fullScreenCover(isPresented: $showingModel) { WayfarerViewer(pose: modelPose).environment(\.colorScheme, colorScheme) }
     }
 
     private var heroCopy: some View {
