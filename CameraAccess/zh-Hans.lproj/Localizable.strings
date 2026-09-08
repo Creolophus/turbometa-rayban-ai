@@ -615,7 +615,7 @@
 "liveai.dashboard.vision" = "视觉";
 
 // Interactive glasses
-"glasses.model.description" = "亮黑框深绿镜片 Wayfarer 眼镜";
+"glasses.model.description" = "哑光黑框深绿镜片 Wayfarer 眼镜";
 "glasses.model.hint" = "横向拖动旋转，轻点放大查看";
 "glasses.rotate.left" = "向左旋转";
 "glasses.rotate.right" = "向右旋转";

@@ -615,7 +615,7 @@
 "liveai.dashboard.vision" = "Vision";
 
 // Interactive glasses
-"glasses.model.description" = "Shiny black Wayfarer glasses with green lenses";
+"glasses.model.description" = "Matte black Wayfarer glasses with green lenses";
 "glasses.model.hint" = "Drag horizontally to rotate. Double tap to expand.";
 "glasses.rotate.left" = "Rotate left";
 "glasses.rotate.right" = "Rotate right";
