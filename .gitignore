@@ -54,3 +54,7 @@ Config/Secrets.xcconfig
 
 # OpenClaw reference (not part of this project)
 openclaw-ref/
+
+# AI assistant local config (not for sharing)
+.qoder/
+.claude/
