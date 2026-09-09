@@ -37,7 +37,6 @@ struct WayfarerSurface: View {
     @Binding var pose: WayfarerPose
     @Binding var ready: Bool
     var drawsBackground = true
-    var scrolling = false
     var fullscreen = false
     var active = true
     var onOpen: () -> Void = {}
@@ -54,7 +53,7 @@ struct WayfarerSurface: View {
                         .clipped().accessibilityHidden(true)
                 }
                 WayfarerRenderer(pose: $pose, ready: $ready, fullscreen: fullscreen,
-                                 active: active && phase == .active, scrolling: scrolling, onOpen: onOpen)
+                                 active: active && phase == .active, onOpen: onOpen)
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .opacity(ready ? 1 : 0)
             }
@@ -121,19 +120,18 @@ private struct WayfarerRenderer: UIViewRepresentable {
     @Binding var ready: Bool
     let fullscreen: Bool
     let active: Bool
-    let scrolling: Bool
     let onOpen: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> WayfarerRenderHost {
-        let view = WayfarerARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
+        let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         view.environment.background = .color(.clear)
         view.isOpaque = false
         view.renderOptions.formUnion([.disableMotionBlur, .disableDepthOfField, .disableCameraGrain, .disableGroundingShadows])
         view.environment.lighting.resource = WayfarerResource.studio
         let host = WayfarerRenderHost(renderer: view)
         context.coordinator.host = host
-        context.coordinator.attach(view)
+        context.coordinator.attach(to: host)
         return host
     }
     func updateUIView(_ view: WayfarerRenderHost, context: Context) {
@@ -158,11 +156,14 @@ private struct WayfarerRenderer: UIViewRepresentable {
         var snapshotWork: DispatchWorkItem?
         var lastPose: WayfarerPose?
         var snapshotPose: WayfarerPose?
+        var scheduledPose: WayfarerPose?
         var modelInstalled = false
+        var isInteracting = false
         var start = WayfarerPose()
         init(_ parent: WayfarerRenderer) { self.parent = parent }
 
-        func attach(_ view: ARView) {
+        func attach(to host: WayfarerRenderHost) {
+            let view = host.renderer
             let anchor = AnchorEntity(world: .zero)
             anchor.addChild(pivot)
             let camera = PerspectiveCamera()
@@ -202,16 +203,16 @@ private struct WayfarerRenderer: UIViewRepresentable {
             }
             let pan = UIPanGestureRecognizer(target: self, action: #selector(drag(_:)))
             pan.maximumNumberOfTouches = 1
-            view.addGestureRecognizer(pan)
-            if !parent.fullscreen, let modelView = view as? WayfarerARView {
-                modelView.rotationPan = pan
-                modelView.coordinateScrolling()
+            host.addGestureRecognizer(pan)
+            if !parent.fullscreen {
+                host.rotationPan = pan
+                host.coordinateScrolling()
             }
             let tap = UITapGestureRecognizer(target: self, action: #selector(open))
             tap.require(toFail: pan)
-            view.addGestureRecognizer(tap)
+            host.addGestureRecognizer(tap)
             if parent.fullscreen {
-                view.addGestureRecognizer(UIPinchGestureRecognizer(target: self, action: #selector(pinch(_:))))
+                host.addGestureRecognizer(UIPinchGestureRecognizer(target: self, action: #selector(pinch(_:))))
             }
         }
         func install(_ prototype: Entity) {
@@ -221,7 +222,7 @@ private struct WayfarerRenderer: UIViewRepresentable {
             pivot.addChild(model)
             modelInstalled = true
             applyPose()
-            scheduleSnapshot()
+            updateActivity()
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.attached else { return }
                 self.parent.ready = true
@@ -232,56 +233,106 @@ private struct WayfarerRenderer: UIViewRepresentable {
             lastPose = parent.pose
             pivot.orientation = simd_quatf(angle: parent.pose.pitch, axis: [1,0,0]) * simd_quatf(angle: parent.pose.yaw, axis: [0,1,0])
             pivot.scale = SIMD3(repeating: parent.pose.scale)
-            scheduleSnapshot()
         }
         func updateActivity() {
             guard let host else { return }
-            let wasHidden = host.renderer.isHidden
-            let frozen = parent.scrolling && host.still.image != nil
-            host.renderer.isHidden = !parent.active || frozen
-            host.still.isHidden = !parent.active || !frozen
-            if wasHidden && !host.renderer.isHidden { scheduleSnapshot() }
+            guard parent.active else {
+                isInteracting = false
+                snapshotWork?.cancel()
+                scheduledPose = nil
+                host.hideContent()
+                return
+            }
+            let frozen = !isInteracting && snapshotPose == parent.pose && host.still.image != nil
+            if frozen {
+                host.displaySnapshot()
+            } else {
+                host.displayRenderer()
+                if !isInteracting { scheduleSnapshot() }
+            }
         }
         func scheduleSnapshot() {
+            guard modelInstalled, parent.active, !isInteracting,
+                  snapshotPose != parent.pose, scheduledPose != parent.pose else { return }
             snapshotWork?.cancel()
-            guard modelInstalled, snapshotPose != parent.pose else { return }
+            let requestedPose = parent.pose
+            scheduledPose = requestedPose
             let work = DispatchWorkItem { [weak self] in
-                guard let self, self.attached, let host = self.host,
-                      !host.renderer.isHidden else { return }
-                let capturedPose = self.parent.pose
+                guard let self else { return }
+                self.scheduledPose = nil
+                guard self.attached, self.parent.active, !self.isInteracting,
+                      self.parent.pose == requestedPose, let host = self.host else { return }
+                host.displayRenderer()
                 host.renderer.snapshot(saveToHDR: false) { [weak self] image in
-                    guard let self, self.attached, self.parent.pose == capturedPose else { return }
+                    guard let self, self.attached, self.parent.active, !self.isInteracting,
+                          self.parent.pose == requestedPose else { return }
                     self.host?.still.image = image
-                    if image != nil { self.snapshotPose = capturedPose }
+                    if image != nil { self.snapshotPose = requestedPose }
                     self.updateActivity()
                 }
             }
             snapshotWork = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
         }
+        func beginInteraction() {
+            isInteracting = true
+            snapshotWork?.cancel()
+            scheduledPose = nil
+            host?.displayRenderer()
+        }
+        func endInteraction() {
+            isInteracting = false
+            updateActivity()
+        }
         @objc func drag(_ pan: UIPanGestureRecognizer) {
-            if pan.state == .began { start = parent.pose }
+            if pan.state == .began {
+                start = parent.pose
+                beginInteraction()
+            }
             let delta = pan.translation(in: pan.view)
             parent.pose.yaw = start.yaw + Float(delta.x) * 0.012
             parent.pose.pitch = start.pitch + Float(delta.y) * 0.008
             parent.pose.constrain()
             applyPose()
+            if pan.state == .ended || pan.state == .cancelled || pan.state == .failed {
+                endInteraction()
+            }
         }
         @objc func pinch(_ pinch: UIPinchGestureRecognizer) {
-            if pinch.state == .began { start = parent.pose }
+            if pinch.state == .began {
+                start = parent.pose
+                beginInteraction()
+            }
             parent.pose.scale = start.scale * Float(pinch.scale)
             parent.pose.constrain()
             applyPose()
+            if pinch.state == .ended || pinch.state == .cancelled || pinch.state == .failed {
+                endInteraction()
+            }
         }
         @objc func open() { parent.onOpen() }
     }
 }
 
-/// Give the model recognizer priority for every drag that begins inside the model.
+/// Owns interaction even while the renderer is detached and a still frame is visible.
 /// Drags beginning elsewhere continue to be handled normally by the scroll view.
-private final class WayfarerARView: ARView {
+final class WayfarerRenderHost: UIView {
+    let renderer: ARView
+    let still = UIImageView()
     weak var rotationPan: UIPanGestureRecognizer?
     private weak var coordinatedScroll: UIScrollView?
+
+    init(renderer: ARView) {
+        self.renderer = renderer
+        super.init(frame: .zero)
+        isOpaque = false
+        still.contentMode = .scaleToFill
+        still.isUserInteractionEnabled = false
+        still.isHidden = true
+        addSubview(renderer)
+        addSubview(still)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
@@ -302,28 +353,31 @@ private final class WayfarerARView: ARView {
             ancestor = view.superview
         }
     }
-}
 
-/// Keep the Metal scene alive across scroll visibility changes. During scrolling,
-/// a cached frame moves with UIKit while the hidden renderer stops drawing.
-private final class WayfarerRenderHost: UIView {
-    let renderer: WayfarerARView
-    let still = UIImageView()
-
-    init(renderer: WayfarerARView) {
-        self.renderer = renderer
-        super.init(frame: .zero)
-        isOpaque = false
-        still.contentMode = .scaleToFill
-        still.isUserInteractionEnabled = false
+    func displayRenderer() {
+        if renderer.superview !== self {
+            insertSubview(renderer, belowSubview: still)
+            renderer.frame = bounds
+        }
+        renderer.isHidden = false
         still.isHidden = true
-        addSubview(renderer)
-        addSubview(still)
     }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func displaySnapshot() {
+        renderer.isHidden = true
+        renderer.removeFromSuperview()
+        still.isHidden = false
+    }
+
+    func hideContent() {
+        renderer.isHidden = true
+        renderer.removeFromSuperview()
+        still.isHidden = true
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        renderer.frame = bounds
+        if renderer.superview === self { renderer.frame = bounds }
         still.frame = bounds
     }
 }

@@ -26,14 +26,15 @@ final class WayfarerTests: XCTestCase {
             window.rootViewController = UIHostingController(rootView: WayfarerViewer(pose: WayfarerPose(yaw: yaw)))
             window.makeKeyAndVisible()
             try await Task.sleep(for: .seconds(3))
-            let ar = try XCTUnwrap(findAR(window))
-            XCTAssertFalse(ar.scene.anchors.isEmpty)
-            let renderedFrame = ar.convert(ar.bounds, to: window)
+            let host = try XCTUnwrap(findHost(window))
+            XCTAssertFalse(host.renderer.scene.anchors.isEmpty)
+            XCTAssertNil(host.renderer.superview, "An idle renderer must leave the visible hierarchy")
+            XCTAssertFalse(host.still.isHidden)
+            let renderedFrame = host.convert(host.bounds, to: window)
             XCTAssertGreaterThanOrEqual(renderedFrame.minX, 0)
             XCTAssertLessThanOrEqual(renderedFrame.maxX, window.bounds.maxX + 1,
                                      "The backdrop must not push full-screen controls beyond the display")
-            let image = await withCheckedContinuation { continuation in ar.snapshot(saveToHDR: false) { continuation.resume(returning: $0) } }
-            let attachment = XCTAttachment(image: try XCTUnwrap(image))
+            let attachment = XCTAttachment(image: try XCTUnwrap(host.still.image))
             attachment.name = "wayfarer-" + name; attachment.lifetime = .keepAlways; add(attachment)
         }
         for style in [UIUserInterfaceStyle.light, .dark] {
@@ -46,8 +47,8 @@ final class WayfarerTests: XCTestCase {
             attachment.lifetime = .keepAlways; add(attachment)
         }
     }
-    private func findAR(_ view: UIView) -> ARView? {
-        if let view = view as? ARView { return view }
-        return view.subviews.lazy.compactMap { self.findAR($0) }.first
+    private func findHost(_ view: UIView) -> WayfarerRenderHost? {
+        if let view = view as? WayfarerRenderHost { return view }
+        return view.subviews.lazy.compactMap { self.findHost($0) }.first
     }
 }

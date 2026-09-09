@@ -31,7 +31,6 @@ struct HomeDashboardView: View {
     @State private var modelReady = false
     @State private var showingModel = false
     @State private var heroVisible = true
-    @State private var scrolling = false
 
     var body: some View {
         ScrollView {
@@ -47,7 +46,6 @@ struct HomeDashboardView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-        .onScrollPhaseChange { _, phase in scrolling = phase == .interacting || phase == .decelerating || phase == .animating }
         .background(HomeStyle.background.ignoresSafeArea())
     }
 
@@ -115,7 +113,7 @@ struct HomeDashboardView: View {
                 heroCopy.padding(.leading, 18).padding(.vertical, 18)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            WayfarerSurface(pose: $modelPose, ready: $modelReady, drawsBackground: false, scrolling: scrolling, active: heroVisible && !showingModel) { showingModel = true }
+            WayfarerSurface(pose: $modelPose, ready: $modelReady, drawsBackground: false, active: heroVisible && !showingModel) { showingModel = true }
                 .frame(maxWidth: .infinity).frame(height: 210)
                 .overlay(alignment: .bottomTrailing) {
                     Button { showingModel = true } label: {
