@@ -115,16 +115,6 @@ struct HomeDashboardView: View {
             }
             WayfarerSurface(pose: $modelPose, ready: $modelReady, drawsBackground: false, active: heroVisible && !showingModel) { showingModel = true }
                 .frame(maxWidth: .infinity).frame(height: 210)
-                .overlay(alignment: .bottomTrailing) {
-                    Button { showingModel = true } label: {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .frame(width: 40, height: 40)
-                    }
-                    .buttonStyle(.plain)
-                    .modifier(HomeGlassControl(shape: Circle(), opaqueColor: .white))
-                    .accessibilityLabel("glasses.expand".localized)
-                    .padding(10)
-                }
             if dynamicTypeSize.isAccessibilitySize { heroCopy.padding(20) }
         }
         .background {

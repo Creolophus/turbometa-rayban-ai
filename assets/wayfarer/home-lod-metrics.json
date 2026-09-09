@@ -1,0 +1,265 @@
+{
+  "trianglesBefore": 100664,
+  "trianglesAfter": 30074,
+  "verticesAfter": 33066,
+  "sourceBytes": 3604704,
+  "lodBytes": 2097317,
+  "meshes": [
+    {
+      "mesh": "Mesh_002_primitive0",
+      "before": 1242,
+      "after": 346,
+      "verticesBefore": 1031,
+      "verticesAfter": 405,
+      "error": 0.007208819501101971
+    },
+    {
+      "mesh": "Mesh_002_primitive1",
+      "before": 3138,
+      "after": 916,
+      "verticesBefore": 3648,
+      "verticesAfter": 1520,
+      "error": 0.005221423227339983
+    },
+    {
+      "mesh": "Mesh_002_primitive2",
+      "before": 20240,
+      "after": 5666,
+      "verticesBefore": 13021,
+      "verticesAfter": 3999,
+      "error": 0.0005320876371115446
+    },
+    {
+      "mesh": "Mesh_002_primitive3",
+      "before": 798,
+      "after": 259,
+      "verticesBefore": 810,
+      "verticesAfter": 347,
+      "error": 0.0020700881723314524
+    },
+    {
+      "mesh": "Mesh_002_primitive4",
+      "before": 2160,
+      "after": 604,
+      "verticesBefore": 1811,
+      "verticesAfter": 628,
+      "error": 0.0014200190780684352
+    },
+    {
+      "mesh": "Mesh_002_primitive5",
+      "before": 1152,
+      "after": 321,
+      "verticesBefore": 854,
+      "verticesAfter": 352,
+      "error": 0.0005124732269905508
+    },
+    {
+      "mesh": "Mesh_002_primitive6",
+      "before": 856,
+      "after": 239,
+      "verticesBefore": 682,
+      "verticesAfter": 275,
+      "error": 0.0012381768319755793
+    },
+    {
+      "mesh": "Mesh_002_primitive7",
+      "before": 1058,
+      "after": 295,
+      "verticesBefore": 761,
+      "verticesAfter": 261,
+      "error": 0.00025741694844327867
+    },
+    {
+      "mesh": "Mesh_002_primitive8",
+      "before": 696,
+      "after": 248,
+      "verticesBefore": 742,
+      "verticesAfter": 358,
+      "error": 0.011824794113636017
+    },
+    {
+      "mesh": "Mesh_002_primitive9",
+      "before": 160,
+      "after": 110,
+      "verticesBefore": 248,
+      "verticesAfter": 198,
+      "error": 0.013021961785852909
+    },
+    {
+      "mesh": "Mesh_002_primitive10",
+      "before": 686,
+      "after": 276,
+      "verticesBefore": 782,
+      "verticesAfter": 403,
+      "error": 0.01417796965688467
+    },
+    {
+      "mesh": "Mesh_002_primitive11",
+      "before": 13,
+      "after": 10,
+      "verticesBefore": 15,
+      "verticesAfter": 12,
+      "error": 0.007656837347894907
+    },
+    {
+      "mesh": "Mesh_004_primitive0",
+      "before": 1070,
+      "after": 718,
+      "verticesBefore": 1651,
+      "verticesAfter": 1305,
+      "error": 0.013928397558629513
+    },
+    {
+      "mesh": "Mesh_004_primitive1",
+      "before": 5836,
+      "after": 1634,
+      "verticesBefore": 3382,
+      "verticesAfter": 1009,
+      "error": 0.0005443274276331067
+    },
+    {
+      "mesh": "Mesh_005_primitive0",
+      "before": 2484,
+      "after": 857,
+      "verticesBefore": 2560,
+      "verticesAfter": 1215,
+      "error": 0.014407298527657986
+    },
+    {
+      "mesh": "Mesh_005_primitive1",
+      "before": 5836,
+      "after": 1634,
+      "verticesBefore": 3380,
+      "verticesAfter": 1005,
+      "error": 0.0005174902617000043
+    },
+    {
+      "mesh": "Mesh_003",
+      "before": 338,
+      "after": 133,
+      "verticesBefore": 352,
+      "verticesAfter": 181,
+      "error": 0.014702490530908108
+    },
+    {
+      "mesh": "Mesh_008_primitive0",
+      "before": 3313,
+      "after": 1521,
+      "verticesBefore": 4935,
+      "verticesAfter": 2929,
+      "error": 0.014863577671349049
+    },
+    {
+      "mesh": "Mesh_008_primitive1",
+      "before": 17877,
+      "after": 5005,
+      "verticesBefore": 13474,
+      "verticesAfter": 4737,
+      "error": 0.0007447313982993364
+    },
+    {
+      "mesh": "Mesh_008_primitive2",
+      "before": 3733,
+      "after": 1045,
+      "verticesBefore": 3318,
+      "verticesAfter": 1398,
+      "error": 0.002747697290033102
+    },
+    {
+      "mesh": "Mesh_008_primitive3",
+      "before": 1792,
+      "after": 500,
+      "verticesBefore": 1495,
+      "verticesAfter": 682,
+      "error": 0.002557832282036543
+    },
+    {
+      "mesh": "Mesh_008_primitive4",
+      "before": 1181,
+      "after": 330,
+      "verticesBefore": 1169,
+      "verticesAfter": 403,
+      "error": 0.0025606758426874876
+    },
+    {
+      "mesh": "Mesh_008_primitive5",
+      "before": 242,
+      "after": 66,
+      "verticesBefore": 264,
+      "verticesAfter": 94,
+      "error": 0.010791999287903309
+    },
+    {
+      "mesh": "Mesh_009_primitive0",
+      "before": 36,
+      "after": 34,
+      "verticesBefore": 48,
+      "verticesAfter": 46,
+      "error": 0.012637773528695107
+    },
+    {
+      "mesh": "Mesh_009_primitive1",
+      "before": 2556,
+      "after": 1043,
+      "verticesBefore": 3406,
+      "verticesAfter": 1820,
+      "error": 0.014841463416814804
+    },
+    {
+      "mesh": "Mesh_009_primitive2",
+      "before": 752,
+      "after": 218,
+      "verticesBefore": 735,
+      "verticesAfter": 295,
+      "error": 0.01487806998193264
+    },
+    {
+      "mesh": "Mesh_009_primitive3",
+      "before": 14297,
+      "after": 4003,
+      "verticesBefore": 11455,
+      "verticesAfter": 4343,
+      "error": 0.0013725943863391876
+    },
+    {
+      "mesh": "Mesh_009_primitive4",
+      "before": 102,
+      "after": 83,
+      "verticesBefore": 242,
+      "verticesAfter": 223,
+      "error": 0.014095871709287167
+    },
+    {
+      "mesh": "Mesh_009_primitive5",
+      "before": 1792,
+      "after": 500,
+      "verticesBefore": 1495,
+      "verticesAfter": 686,
+      "error": 0.0023765848018229008
+    },
+    {
+      "mesh": "Mesh_009_primitive6",
+      "before": 3733,
+      "after": 1044,
+      "verticesBefore": 3312,
+      "verticesAfter": 1395,
+      "error": 0.002613059477880597
+    },
+    {
+      "mesh": "Mesh_009_primitive7",
+      "before": 1257,
+      "after": 350,
+      "verticesBefore": 1125,
+      "verticesAfter": 450,
+      "error": 0.0029080247040838003
+    },
+    {
+      "mesh": "Mesh_009_primitive9",
+      "before": 238,
+      "after": 66,
+      "verticesBefore": 258,
+      "verticesAfter": 92,
+      "error": 0.010640434920787811
+    }
+  ]
+}

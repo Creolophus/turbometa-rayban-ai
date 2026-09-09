@@ -17,7 +17,7 @@ struct WayfarerPose: Equatable {
 /// A cached, immutable prototype; every visible renderer owns its own clone.
 @MainActor
 private enum WayfarerResource {
-    static var prototype: Entity?
+    static var prototypes: [String: Entity] = [:]
     static let studio: EnvironmentResource? = {
         let image = UIGraphicsImageRenderer(size: CGSize(width: 512, height: 256)).image { context in
             UIColor(white: 0.35, alpha: 1).setFill()
@@ -61,7 +61,7 @@ struct WayfarerSurface: View {
         .clipped()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("glasses.model.description".localized)
-        .accessibilityHint("glasses.model.hint".localized)
+        .accessibilityHint((fullscreen ? "glasses.fullscreen.hint" : "glasses.model.hint").localized)
         .accessibilityAction(named: Text("glasses.rotate.left".localized)) { pose.yaw -= .pi / 8 }
         .accessibilityAction(named: Text("glasses.rotate.right".localized)) { pose.yaw += .pi / 8 }
         .accessibilityAction(named: Text("glasses.reset".localized)) { pose = WayfarerPose() }
@@ -194,10 +194,11 @@ private struct WayfarerRenderer: UIViewRepresentable {
                 anchor.addChild(shadow)
             }
             view.scene.addAnchor(anchor)
-            if let model = WayfarerResource.prototype { install(model) }
+            let resourceName = parent.fullscreen ? "Wayfarer.usdz" : "WayfarerHome.usdz"
+            if let model = WayfarerResource.prototypes[resourceName] { install(model) }
             else {
-                load = Entity.loadAsync(named: "Wayfarer.usdz").sink(receiveCompletion: { _ in }, receiveValue: { [weak self] entity in
-                    WayfarerResource.prototype = entity
+                load = Entity.loadAsync(named: resourceName).sink(receiveCompletion: { _ in }, receiveValue: { [weak self] entity in
+                    WayfarerResource.prototypes[resourceName] = entity
                     self?.install(entity)
                 })
             }
@@ -208,9 +209,12 @@ private struct WayfarerRenderer: UIViewRepresentable {
                 host.rotationPan = pan
                 host.coordinateScrolling()
             }
-            let tap = UITapGestureRecognizer(target: self, action: #selector(open))
-            tap.require(toFail: pan)
-            host.addGestureRecognizer(tap)
+            if !parent.fullscreen {
+                let tap = UITapGestureRecognizer(target: self, action: #selector(open))
+                tap.numberOfTapsRequired = 2
+                tap.require(toFail: pan)
+                host.addGestureRecognizer(tap)
+            }
             if parent.fullscreen {
                 host.addGestureRecognizer(UIPinchGestureRecognizer(target: self, action: #selector(pinch(_:))))
             }

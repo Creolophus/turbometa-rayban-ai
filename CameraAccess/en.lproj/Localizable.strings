@@ -611,7 +611,7 @@
 
 // Interactive glasses
 "glasses.model.description" = "Matte black Wayfarer glasses with green lenses";
-"glasses.model.hint" = "Drag in any direction to rotate. Tap to expand.";
+"glasses.model.hint" = "Drag to rotate. Double-tap to expand.";
 "glasses.rotate.left" = "Rotate left";
 "glasses.rotate.right" = "Rotate right";
 "glasses.reset" = "Reset";
