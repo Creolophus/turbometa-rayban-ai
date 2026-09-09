@@ -7,7 +7,7 @@ struct RecordEntryID: Hashable {
 }
 
 enum RecordKind: String, CaseIterable {
-    case liveAI, translation, audioNote, quickVision
+    case liveAI, translation, audioNote, quickVision, leanEat
 
     var title: String {
         switch self {
@@ -15,6 +15,7 @@ enum RecordKind: String, CaseIterable {
         case .translation: return "records.filter.translation".localized
         case .audioNote: return "home.assistant.notes".localized
         case .quickVision: return "home.assistant.vision".localized
+        case .leanEat: return "LeanEat"
         }
     }
 }
@@ -23,7 +24,7 @@ enum RecordsFilter: String, CaseIterable, Identifiable {
     case all, liveAI, translation, audioNote, quickVision, leanEat, wordLearn
     var id: Self { self }
     var kind: RecordKind? { RecordKind(rawValue: rawValue) }
-    var isComingSoon: Bool { self == .leanEat || self == .wordLearn }
+    var isComingSoon: Bool { self == .wordLearn }
     var title: String {
         switch self {
         case .all: return "records.filter.all".localized
@@ -43,6 +44,7 @@ enum RecordEntry: Identifiable {
     case translation(TranslationSession)
     case audioNote(AudioNote)
     case quickVision(QuickVisionRecord)
+    case leanEat(LeanEatRecord)
 
     var id: RecordEntryID {
         switch self {
@@ -50,6 +52,7 @@ enum RecordEntry: Identifiable {
         case .translation(let session): return RecordEntryID(kind: .translation, value: session.id)
         case .audioNote(let note): return RecordEntryID(kind: .audioNote, value: note.id)
         case .quickVision(let record): return RecordEntryID(kind: .quickVision, value: record.id)
+        case .leanEat(let record): return RecordEntryID(kind: .leanEat, value: record.id)
         }
     }
 
@@ -59,6 +62,7 @@ enum RecordEntry: Identifiable {
         case .translation(let session): return session.endDate
         case .audioNote(let note): return note.createdAt
         case .quickVision(let record): return record.timestamp
+        case .leanEat(let record): return record.timestamp
         }
     }
 
@@ -72,6 +76,7 @@ enum RecordEntry: Identifiable {
         case .audioNote(let note): text = note.title
         case .quickVision(let record):
             text = record.result.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        case .leanEat(let record): text = record.title
         }
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "#*")))
         return cleaned.isEmpty ? id.kind.title : cleaned
@@ -86,6 +91,7 @@ enum RecordEntry: Identifiable {
         case .quickVision(let record):
             let lines = record.result.split(whereSeparator: \.isNewline)
             return lines.count > 1 ? lines.dropFirst().joined(separator: " ") : record.mode.displayName
+        case .leanEat(let record): return "\(record.nutrition.totalCalories) kcal"
         }
     }
 
@@ -95,6 +101,7 @@ enum RecordEntry: Identifiable {
         case .translation(let session): return session.records.map { $0.originalText + "\n" + $0.translatedText }.joined(separator: "\n")
         case .audioNote(let note): return note.title + "\n" + note.transcript
         case .quickVision(let record): return record.result + "\n" + record.prompt + "\n" + record.mode.displayName
+        case .leanEat(let record): return record.title + "\n" + record.nutrition.suggestions.joined(separator: "\n")
         }
     }
 
@@ -108,7 +115,7 @@ enum RecordEntry: Identifiable {
         case .audioNote(let note):
             let seconds = max(0, Int(note.duration))
             return String(format: "%02d:%02d", seconds / 60, seconds % 60)
-        case .quickVision: return nil
+        case .quickVision, .leanEat: return nil
         }
     }
 }

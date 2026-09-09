@@ -98,6 +98,37 @@
 "photo.saved" = "Saved";
 
 // MARK: - LeanEat (Nutrition Analysis)
+"leaneat.configError" = "Configure a vision provider and API key in Settings first";
+"leaneat.imageError" = "Unable to read this photo. Please choose another.";
+"leaneat.responseError" = "The nutrition result has an invalid format. Please retry.";
+"leaneat.timeout" = "The request timed out. Please retry.";
+"leaneat.cameraError" = "Unable to use the glasses camera. Check connection and camera permission, or choose a photo.";
+"leaneat.httpError" = "Analysis unavailable (%d). Check provider settings or retry later.";
+"leaneat.foodPhoto" = "Food photo for this analysis";
+"leaneat.analyzingHint" = "Identifying food and estimating portions";
+"leaneat.saveFailed" = "Analysis complete, but not saved to Records. Please retry saving.";
+"leaneat.unsavedTitle" = "Result not saved";
+"leaneat.unsavedMessage" = "Leaving will discard this result. Retry saving or discard it.";
+"leaneat.retrySave" = "Retry saving";
+"leaneat.discard" = "Discard result";
+"leaneat.connecting" = "Connecting glasses camera";
+"leaneat.capturing" = "Taking photo";
+"leaneat.loadingPhoto" = "Preparing photo";
+"leaneat.saving" = "Saving";
+"leaneat.saved" = "Saved to Records";
+"leaneat.another" = "Another meal";
+"leaneat.reselect" = "Choose again";
+"leaneat.capture" = "Capture & analyze";
+"leaneat.reconnect" = "Reconnect";
+"leaneat.library" = "Choose photo";
+"leaneat.canClose" = "Close at any time to cancel this analysis";
+"leaneat.noGlasses" = "No camera preview";
+"leaneat.noGlassesHint" = "Connect your glasses or choose a food photo from your library";
+"leaneat.frameHint" = "Place the food in the frame";
+"leaneat.estimatedCalories" = "Estimated calories";
+"leaneat.macros" = "Protein %.1fg · Fat %.1fg · Carbs %.1fg";
+"leaneat.estimateHint" = "Nutrition estimated from the photo";
+"leaneat.noFood" = "No food detected. Take or choose a clearer food photo.";
 "leaneat.title" = "Nutrition Analysis";
 "leaneat.analyzing" = "Analyzing...";
 "leaneat.healthscore" = "Health Score";

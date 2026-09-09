@@ -1,423 +1,340 @@
-/*
- * LeanEat View
- * 食物营养分析界面
- */
-
 import SwiftUI
+import PhotosUI
 
 struct LeanEatView: View {
-    @StateObject private var viewModel: LeanEatViewModel
+    @StateObject private var model: LeanEatViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var selection: PhotosPickerItem?
+    @State private var confirmUnsaved = false
+    @State private var pendingReset = false
 
-    let photo: UIImage
+    init(streamViewModel: StreamSessionViewModel) {
+        _model = StateObject(wrappedValue: LeanEatViewModel(parentCamera: streamViewModel))
+    }
 
-    init(photo: UIImage, apiKey: String) {
-        self.photo = photo
-        self._viewModel = StateObject(wrappedValue: LeanEatViewModel(photo: photo, apiKey: apiKey))
+    init(model: LeanEatViewModel) {
+        _model = StateObject(wrappedValue: model)
+    }
+
+    /// Legacy photo preview enters the same analysis/result flow, without another camera.
+    init(photo: UIImage) {
+        _model = StateObject(wrappedValue: LeanEatViewModel(photo: photo))
     }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                AppColors.secondaryBackground
-                    .ignoresSafeArea()
+        VStack(spacing: 0) {
+            HStack {
+                Text("LeanEat").font(.title2.bold()).accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button { leave(reset: false) } label: {
+                    Image(systemName: "xmark").font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
+                }
+                .modifier(LeanEatGlass())
+                .accessibilityLabel("close".localized)
+                .accessibilityIdentifier("leaneat.close")
+            }
+            .padding(.horizontal, 20).padding(.vertical, 12)
 
-                ScrollView {
-                    VStack(spacing: AppSpacing.lg) {
-                        // Photo section
-                        photoSection
-
-                        if viewModel.isAnalyzing {
-                            analyzingView
-                        } else if let error = viewModel.errorMessage {
-                            errorView(error)
-                        } else if let nutrition = viewModel.nutritionData {
-                            nutritionResultView(nutrition)
-                        } else {
-                            analyzePromptView
+            ScrollView {
+                VStack(spacing: 16) {
+                    if let photo = model.photo {
+                        Image(uiImage: photo).resizable().scaledToFit()
+                            .frame(maxHeight: 240).frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 24))
+                            .accessibilityLabel("leaneat.foodPhoto".localized)
+                    } else if let camera = model.camera {
+                        LeanEatCameraPreview(camera: camera)
+                    } else if model.phase == .ready {
+                        ContentUnavailableView("leaneat.library".localized, systemImage: "photo",
+                            description: Text("leaneat.noGlassesHint".localized))
+                    }
+                    switch model.phase {
+                    case .starting, .capturing, .loadingPhoto, .analyzing:
+                        VStack(spacing: 14) {
+                            ProgressView().tint(HomeStyle.coral)
+                            Text(progressLabel).font(.headline)
+                            if model.phase == .analyzing {
+                                Text("leaneat.analyzingHint".localized).font(.subheadline).foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity).padding(.vertical, 36)
+                        .accessibilityElement(children: .combine)
+                    case .failed:
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle").font(.title).foregroundStyle(.orange)
+                            Text("leaneat.error.title".localized).font(.headline)
+                            Text(model.errorMessage ?? "").font(.body).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity).padding(20).background(HomeStyle.card, in: RoundedRectangle(cornerRadius: 24))
+                    case .result:
+                        if let nutrition = model.nutrition { LeanEatNutritionContent(nutrition: nutrition) }
+                        if model.saveState == .failed {
+                            Label("leaneat.saveFailed".localized, systemImage: "exclamationmark.icloud")
+                                .font(.subheadline).foregroundStyle(.orange)
+                                .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+                                .background(HomeStyle.card, in: RoundedRectangle(cornerRadius: 20))
+                        }
+                    default:
+                        if let error = model.errorMessage {
+                            Text(error).font(.subheadline).foregroundStyle(.secondary)
                         }
                     }
-                    .padding()
+                }
+                .padding(.horizontal, 20).padding(.vertical, 8)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                controls.padding(14).modifier(LeanEatGlass())
+                    .padding(.horizontal, 20).padding(.vertical, 8)
+            }
+        }
+        .background(HomeStyle.background.ignoresSafeArea())
+        .tint(HomeStyle.coral)
+        .interactiveDismissDisabled(model.hasUnsavedResult)
+        .task { model.enter() }
+        .onDisappear { model.close() }
+        .onChange(of: scenePhase) { _, scene in model.sceneChanged(scene) }
+        .onChange(of: selection) { _, item in
+            guard let item else { return }
+            model.selectPhoto {
+                guard let data = try await item.loadTransferable(type: Data.self) else { throw LeanEatError.image }
+                return data
+            }
+            selection = nil
+        }
+        .alert("leaneat.unsavedTitle".localized, isPresented: $confirmUnsaved) {
+            Button("leaneat.retrySave".localized) { model.retrySaving() }
+            Button("leaneat.discard".localized, role: .destructive) { finishLeave() }
+            Button("common.cancel".localized, role: .cancel) {}
+        } message: { Text("leaneat.unsavedMessage".localized) }
+    }
+
+    private var progressLabel: String {
+        switch model.phase {
+        case .starting: return "leaneat.connecting".localized
+        case .capturing: return "leaneat.capturing".localized
+        case .loadingPhoto: return "leaneat.loadingPhoto".localized
+        default: return "leaneat.analyzing".localized
+        }
+    }
+
+    @ViewBuilder private var controls: some View {
+        VStack(spacing: 10) {
+            if model.phase == .result {
+                if model.saveState == .saving {
+                    Label("leaneat.saving".localized, systemImage: "arrow.triangle.2.circlepath").font(.caption).foregroundStyle(.secondary)
+                } else if model.saveState == .saved {
+                    Label("leaneat.saved".localized, systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.green)
+                }
+                if model.saveState == .failed {
+                    action("leaneat.retrySave", icon: "arrow.clockwise", primary: true) { model.retrySaving() }
+                }
+                let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 10)) : AnyLayout(HStackLayout(spacing: 10))
+                layout {
+                    action("leaneat.another", icon: "camera", primary: false) { leave(reset: true) }
+                    action("common.done", icon: "checkmark", primary: true) { leave(reset: false) }
+                }
+            } else if model.phase == .ready || model.phase == .failed {
+                if model.phase == .failed {
+                    action("leaneat.retry", icon: "arrow.clockwise", primary: true) { model.retry() }
+                    if model.photo != nil {
+                        action("leaneat.reselect", icon: "camera", primary: false) { model.reset() }
+                    }
+                } else {
+                    action("leaneat.capture", icon: "camera.fill", primary: true) { model.capture() }
+                        .disabled(!model.canCapture).opacity(model.canCapture ? 1 : 0.45)
+                    if model.camera?.hasReceivedFirstFrame != true, model.camera != nil {
+                        action("leaneat.reconnect", icon: "arrow.clockwise", primary: false) { model.startCamera() }
+                    }
+                }
+                PhotosPicker(selection: $selection, matching: .images, photoLibrary: .shared()) {
+                    Label("leaneat.library".localized, systemImage: "photo")
+                        .font(.body.weight(.medium)).frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .accessibilityIdentifier("leaneat.library")
+            } else {
+                Text("leaneat.canClose".localized).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func action(_ key: String, icon: String, primary: Bool, perform: @escaping () -> Void) -> some View {
+        Button(action: perform) {
+            Group {
+                if typeSize.isAccessibilitySize { Text(key.localized) }
+                else { Label(key.localized, systemImage: icon) }
+            }.font(.body.weight(.medium))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .padding(.horizontal, 12)
+                .foregroundStyle(primary ? .white : HomeStyle.coral)
+                .background(primary ? HomeStyle.coral : HomeStyle.coral.opacity(0.09), in: Capsule())
+        }
+        .accessibilityIdentifier(key)
+    }
+
+    private func leave(reset: Bool) {
+        pendingReset = reset
+        Task {
+            await model.waitForSave()
+            if model.hasUnsavedResult { confirmUnsaved = true }
+            else { finishLeave() }
+        }
+    }
+
+    private func finishLeave() {
+        if pendingReset { model.reset() }
+        else { model.close(); dismiss() }
+    }
+}
+
+private struct LeanEatCameraPreview: View {
+    @ObservedObject var camera: StreamSessionViewModel
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "eyeglasses")
+                Text(camera.connectedDevice.displayName).lineLimit(1)
+                Spacer()
+                Text(camera.connectedDevice.statusText).font(.caption).foregroundStyle(.secondary)
+            }
+            .font(.subheadline).padding(14).background(HomeStyle.card, in: RoundedRectangle(cornerRadius: 18))
+            ZStack {
+                RoundedRectangle(cornerRadius: 24).fill(HomeStyle.card)
+                if let image = camera.currentVideoFrame {
+                    GeometryReader { geometry in
+                        Image(uiImage: image).resizable().scaledToFill()
+                            .frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                    }
+                } else {
+                    VStack(spacing: 16) {
+                        Image(systemName: "eyeglasses").font(.system(size: 42)).foregroundStyle(.secondary)
+                        Text("leaneat.noGlasses".localized).font(.headline)
+                        Text("leaneat.noGlassesHint".localized).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    .multilineTextAlignment(.center).padding(24)
                 }
             }
-            .navigationTitle("LeanEat 营养分析")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
-                        dismiss()
+            .frame(height: 310).clipShape(RoundedRectangle(cornerRadius: 24))
+            Text("leaneat.frameHint".localized).font(.subheadline).foregroundStyle(.secondary)
+        }
+    }
+}
+
+struct LeanEatNutritionContent: View {
+    let nutrition: FoodNutritionResponse
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        VStack(spacing: 16) {
+            card {
+                Text("leaneat.estimatedCalories".localized).font(.subheadline).foregroundStyle(.secondary)
+                Text("\(nutrition.totalCalories) kcal").font(.title.bold())
+                let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 14)) : AnyLayout(HStackLayout(spacing: 14))
+                layout {
+                    nutrient("leaneat.protein", value: nutrition.totalProtein)
+                    nutrient("leaneat.fat", value: nutrition.totalFat)
+                    nutrient("leaneat.carbs", value: nutrition.totalCarbs)
+                }
+            }
+            card {
+                HStack {
+                    Text("leaneat.healthscore".localized).font(.headline)
+                    Spacer()
+                    Text("\(nutrition.healthScore)").font(.headline)
+                }
+                ProgressView(value: Double(nutrition.healthScore), total: 100).tint(.green)
+                    .accessibilityLabel("leaneat.healthscore".localized).accessibilityValue("\(nutrition.healthScore)/100")
+            }
+            card {
+                Text("leaneat.foods".localized).font(.headline)
+                ForEach(nutrition.foods) { food in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .top) {
+                            Text(food.name).font(.body.weight(.medium))
+                            Spacer()
+                            Text("\(food.calories) kcal").font(.subheadline)
+                        }
+                        Text(food.portion).font(.caption).foregroundStyle(.secondary)
+                        Text(String(format: "leaneat.macros".localized, food.protein, food.fat, food.carbs))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            if !nutrition.suggestions.isEmpty {
+                card {
+                    Text("leaneat.suggestions".localized).font(.headline)
+                    ForEach(Array(nutrition.suggestions.enumerated()), id: \.offset) { _, text in
+                        Text(text).font(.body).foregroundStyle(.secondary)
                     }
                 }
             }
-        }
-        .task {
-            // Auto-analyze on appear
-            if viewModel.nutritionData == nil && viewModel.errorMessage == nil {
-                await viewModel.analyzeFood()
-            }
+            Text("leaneat.estimateHint".localized).font(.caption).foregroundStyle(.secondary)
         }
     }
 
-    // MARK: - Photo Section
-
-    private var photoSection: some View {
-        Image(uiImage: photo)
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .frame(maxHeight: 250)
-            .cornerRadius(AppCornerRadius.lg)
-            .shadow(color: AppShadow.medium(), radius: 8, x: 0, y: 4)
-    }
-
-    // MARK: - Analyzing View
-
-    private var analyzingView: some View {
-        VStack(spacing: AppSpacing.lg) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(AppColors.leanEat)
-
-            Text("AI正在分析食物营养...")
-                .font(AppTypography.headline)
-                .foregroundColor(AppColors.textPrimary)
-
-            Text("请稍候，这可能需要几秒钟")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.textSecondary)
+    private func nutrient(_ key: String, value: Double) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(key.localized).font(.caption).foregroundStyle(.secondary)
+            Text(String(format: "%.1f g", value)).font(.body.weight(.medium))
         }
-        .padding(.vertical, AppSpacing.xl)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Error View
+    private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 14, content: content)
+            .frame(maxWidth: .infinity, alignment: .leading).padding(18)
+            .background(HomeStyle.card, in: RoundedRectangle(cornerRadius: 24))
+    }
+}
 
-    private func errorView(_ error: String) -> some View {
-        VStack(spacing: AppSpacing.lg) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.orange)
-
-            Text("分析失败")
-                .font(AppTypography.title2)
-                .foregroundColor(AppColors.textPrimary)
-
-            Text(error)
-                .font(AppTypography.body)
-                .foregroundColor(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-
-            Button {
-                Task {
-                    await viewModel.retry()
+struct LeanEatRecordDetailView: View {
+    let record: LeanEatRecord
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    LeanEatStoredPhoto(record: record).frame(maxHeight: 240).clipShape(RoundedRectangle(cornerRadius: 24))
+                    Text(record.timestamp.formatted()).font(.caption).foregroundStyle(.secondary)
+                    LeanEatNutritionContent(nutrition: record.nutrition)
                 }
-            } label: {
-                HStack {
-                    Image(systemName: "arrow.clockwise")
-                    Text("重试")
-                }
-                .font(AppTypography.headline)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, AppSpacing.md)
-                .background(AppColors.leanEat)
-                .cornerRadius(AppCornerRadius.lg)
+                .padding(20)
             }
-            .padding(.horizontal, AppSpacing.xl)
-        }
-        .padding(.vertical, AppSpacing.xl)
-    }
-
-    // MARK: - Analyze Prompt View
-
-    private var analyzePromptView: some View {
-        VStack(spacing: AppSpacing.lg) {
-            Image(systemName: "chart.bar.doc.horizontal.fill")
-                .font(.system(size: 60))
-                .foregroundColor(AppColors.leanEat)
-
-            Text("开始分析")
-                .font(AppTypography.title2)
-                .foregroundColor(AppColors.textPrimary)
-
-            Text("点击下方按钮开始分析食物营养")
-                .font(AppTypography.body)
-                .foregroundColor(AppColors.textSecondary)
-
-            Button {
-                Task {
-                    await viewModel.analyzeFood()
-                }
-            } label: {
-                HStack {
-                    Image(systemName: "sparkles")
-                    Text("开始分析")
-                }
-                .font(AppTypography.headline)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, AppSpacing.md)
-                .background(
-                    LinearGradient(
-                        colors: [AppColors.leanEat, AppColors.leanEat.opacity(0.8)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(AppCornerRadius.lg)
-            }
-            .padding(.horizontal, AppSpacing.xl)
-        }
-        .padding(.vertical, AppSpacing.xl)
-    }
-
-    // MARK: - Nutrition Result View
-
-    private func nutritionResultView(_ nutrition: FoodNutritionResponse) -> some View {
-        VStack(spacing: AppSpacing.lg) {
-            // Health Score Card
-            healthScoreCard(nutrition)
-
-            // Total Nutrition Summary
-            totalNutritionCard(nutrition)
-
-            // Food Items List
-            foodItemsList(nutrition.foods)
-
-            // Health Suggestions
-            if !nutrition.suggestions.isEmpty {
-                suggestionsCard(nutrition.suggestions)
-            }
-        }
-    }
-
-    // MARK: - Health Score Card
-
-    private func healthScoreCard(_ nutrition: FoodNutritionResponse) -> some View {
-        VStack(spacing: AppSpacing.md) {
-            Text("健康评分")
-                .font(AppTypography.headline)
-                .foregroundColor(AppColors.textPrimary)
-
-            ZStack {
-                Circle()
-                    .stroke(
-                        Color.gray.opacity(0.2),
-                        lineWidth: 15
-                    )
-                    .frame(width: 140, height: 140)
-
-                Circle()
-                    .trim(from: 0, to: CGFloat(nutrition.healthScore) / 100)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color(nutrition.healthScoreColor == "green" ? .green : nutrition.healthScoreColor == "yellow" ? .yellow : nutrition.healthScoreColor == "orange" ? .orange : .red),
-                                Color(nutrition.healthScoreColor == "green" ? .green : nutrition.healthScoreColor == "yellow" ? .yellow : nutrition.healthScoreColor == "orange" ? .orange : .red).opacity(0.6)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 15, lineCap: .round)
-                    )
-                    .frame(width: 140, height: 140)
-                    .rotationEffect(.degrees(-90))
-
-                VStack(spacing: 4) {
-                    Text("\(nutrition.healthScore)")
-                        .font(.system(size: 48, weight: .bold))
-                        .foregroundColor(AppColors.textPrimary)
-
-                    Text(nutrition.healthScoreText)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
+            .background(HomeStyle.background)
+            .navigationTitle("LeanEat").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("common.done".localized) { dismiss() }
                 }
             }
         }
-        .padding()
-        .background(AppColors.tertiaryBackground)
-        .cornerRadius(AppCornerRadius.xl)
-        .shadow(color: AppShadow.small(), radius: 4, x: 0, y: 2)
     }
+}
 
-    // MARK: - Total Nutrition Card
-
-    private func totalNutritionCard(_ nutrition: FoodNutritionResponse) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.md) {
-            Text("总营养成分")
-                .font(AppTypography.headline)
-                .foregroundColor(AppColors.textPrimary)
-
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: AppSpacing.md) {
-                nutritionItem(
-                    icon: "flame.fill",
-                    title: "热量",
-                    value: nutrition.formattedTotalCalories,
-                    color: .orange
-                )
-
-                nutritionItem(
-                    icon: "leaf.fill",
-                    title: "蛋白质",
-                    value: nutrition.formattedTotalProtein,
-                    color: .green
-                )
-
-                nutritionItem(
-                    icon: "drop.fill",
-                    title: "脂肪",
-                    value: nutrition.formattedTotalFat,
-                    color: .yellow
-                )
-
-                nutritionItem(
-                    icon: "sparkles",
-                    title: "碳水",
-                    value: nutrition.formattedTotalCarbs,
-                    color: .blue
-                )
-            }
+struct LeanEatStoredPhoto: View {
+    let record: LeanEatRecord
+    @State private var image: UIImage?
+    var body: some View {
+        Group {
+            if let image { Image(uiImage: image).resizable().scaledToFit() }
+            else { Image(systemName: "leaf").foregroundStyle(.green) }
         }
-        .padding()
-        .background(AppColors.tertiaryBackground)
-        .cornerRadius(AppCornerRadius.xl)
-        .shadow(color: AppShadow.small(), radius: 4, x: 0, y: 2)
-    }
-
-    private func nutritionItem(icon: String, title: String, value: String, color: Color) -> some View {
-        VStack(spacing: AppSpacing.sm) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
-
-            Text(title)
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.textSecondary)
-
-            Text(value)
-                .font(AppTypography.headline)
-                .foregroundColor(AppColors.textPrimary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(AppColors.secondaryBackground)
-        .cornerRadius(AppCornerRadius.lg)
-    }
-
-    // MARK: - Food Items List
-
-    private func foodItemsList(_ foods: [FoodItem]) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.md) {
-            Text("食物明细")
-                .font(AppTypography.headline)
-                .foregroundColor(AppColors.textPrimary)
-                .padding(.horizontal)
-
-            ForEach(foods) { food in
-                foodItemCard(food)
-            }
+        .task(id: record.id) {
+            let url = LeanEatStorage.shared.imageURL(for: record)
+            let data = await Task.detached(priority: .utility) { try? Data(contentsOf: url) }.value
+            guard !Task.isCancelled else { return }
+            image = data.flatMap(UIImage.init(data:))
         }
     }
+}
 
-    private func foodItemCard(_ food: FoodItem) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            // Food name and rating
-            HStack {
-                Text(food.healthRatingEmoji)
-                    .font(.title2)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(food.name)
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.textPrimary)
-
-                    Text(food.portion)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-
-                Spacer()
-
-                Text(food.healthRating)
-                    .font(AppTypography.caption)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, AppSpacing.sm)
-                    .padding(.vertical, 4)
-                    .background(
-                        food.healthRating == "优秀" ? Color.green :
-                        food.healthRating == "良好" ? Color.yellow :
-                        food.healthRating == "一般" ? Color.orange : Color.red
-                    )
-                    .cornerRadius(AppCornerRadius.sm)
-            }
-
-            Divider()
-
-            // Nutrition details
-            HStack(spacing: AppSpacing.lg) {
-                miniNutritionItem(icon: "flame.fill", value: "\(food.calories)", unit: "千卡", color: .orange)
-                miniNutritionItem(icon: "leaf.fill", value: String(format: "%.1f", food.protein), unit: "g", color: .green)
-                miniNutritionItem(icon: "drop.fill", value: String(format: "%.1f", food.fat), unit: "g", color: .yellow)
-                miniNutritionItem(icon: "sparkles", value: String(format: "%.1f", food.carbs), unit: "g", color: .blue)
-            }
-        }
-        .padding()
-        .background(AppColors.tertiaryBackground)
-        .cornerRadius(AppCornerRadius.lg)
-        .shadow(color: AppShadow.small(), radius: 4, x: 0, y: 2)
-    }
-
-    private func miniNutritionItem(icon: String, value: String, unit: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundColor(color)
-
-            HStack(spacing: 2) {
-                Text(value)
-                    .font(.system(size: 14, weight: .semibold))
-                Text(unit)
-                    .font(.system(size: 10))
-            }
-            .foregroundColor(AppColors.textPrimary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Suggestions Card
-
-    private func suggestionsCard(_ suggestions: [String]) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.md) {
-            HStack {
-                Image(systemName: "lightbulb.fill")
-                    .foregroundColor(AppColors.leanEat)
-                Text("营养建议")
-                    .font(AppTypography.headline)
-                    .foregroundColor(AppColors.textPrimary)
-            }
-
-            ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
-                HStack(alignment: .top, spacing: AppSpacing.sm) {
-                    Text("\(index + 1).")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.leanEat)
-                        .fontWeight(.bold)
-
-                    Text(suggestion)
-                        .font(AppTypography.body)
-                        .foregroundColor(AppColors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-        .padding()
-        .background(AppColors.leanEat.opacity(0.1))
-        .cornerRadius(AppCornerRadius.lg)
-        .overlay(
-            RoundedRectangle(cornerRadius: AppCornerRadius.lg)
-                .stroke(AppColors.leanEat.opacity(0.3), lineWidth: 1)
-        )
+private struct LeanEatGlass: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    func body(content: Content) -> some View {
+        if reduceTransparency { content.background(HomeStyle.card, in: RoundedRectangle(cornerRadius: 28)) }
+        else { content.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28)) }
     }
 }

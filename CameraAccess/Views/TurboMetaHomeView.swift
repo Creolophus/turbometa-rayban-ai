@@ -42,7 +42,7 @@ struct TurboMetaHomeView: View {
                 case .rtmp:
                     RTMPStreamingView(streamViewModel: streamViewModel)
                 case .leanEat:
-                    StreamView(viewModel: streamViewModel, wearablesVM: wearablesViewModel)
+                    LeanEatView(streamViewModel: streamViewModel)
                 }
             }
         }

@@ -7,13 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
- F026090900000000000000B1 = {isa = PBXBuildFile; fileRef = F026090900000000000000B2; };
- F026090800000000000000A1 = {isa = PBXBuildFile; fileRef = F026090800000000000000A2; };
- F026090800000000000000A3 = {isa = PBXBuildFile; fileRef = F026090800000000000000A4; };
-		F02609080000000000000012 /* RecordsLibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609080000000000000002; };
-		F02609080000000000000011 /* RecordEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609080000000000000001; };
-		F02609070000000000000022 /* HomeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609070000000000000021 /* HomeDashboardView.swift */; };
-		F02609070000000000000012 /* GlassesDeviceStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609070000000000000011 /* GlassesDeviceStatus.swift */; };
 		05043536CDB06C0B88B3C4D9 /* TTSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 069172850B30A2766C8BD4B5 /* TTSService.swift */; };
 		217BDD58A35C2D24403F74BF /* APIProviderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1111827A1CF7A278A6DC6934 /* APIProviderManager.swift */; };
 		26664DE8308E3F2981609421 /* QuickVisionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA3E36CE337855A7F17F2AC8 /* QuickVisionService.swift */; };
@@ -80,7 +73,6 @@
 		5F1DD829120116C2EB177411 /* QuickVisionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 330AF93394A09D97C504F568 /* QuickVisionSettingsView.swift */; };
 		6FE225749B8E795D8D265971 /* QuickVisionStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F490219E64EC144DAF8A8C /* QuickVisionStorage.swift */; };
 		759D8C3F84F44478678CA613 /* LiveAIManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC72379319F7F8AAF8019018 /* LiveAIManager.swift */; };
-		AR0002000200020002 /* AppRouteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AR0001000100010001 /* AppRouteManager.swift */; };
 		8AAC01AA9E2C673BDDD9C7C5 /* QuickVisionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 414A2AC7E8B825BC1B4DB93F /* QuickVisionModels.swift */; };
 		8FD96B7F2E6F0A9800F56AB1 /* TurboMetaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FD96B792E6F0A9800F56AB1 /* TurboMetaApp.swift */; };
 		8FD96B8D2E6F0A9800F56AB1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8FD96B772E6F0A9800F56AB1 /* Assets.xcassets */; };
@@ -88,8 +80,25 @@
 		8FD96B952E6F0F7D00F56AB2 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = 8FD96B942E6F0F7D00F56AB2 /* MWDATCamera */; };
 		8FD96B952E6F0F7D00F56AB3 /* MWDATMockDevice in Frameworks */ = {isa = PBXBuildFile; productRef = 8FD96B942E6F0F7D00F56AB3 /* MWDATMockDevice */; };
 		A5C50340AFD334B459151AF1 /* QuickVisionIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 568E19B82D2116C7FE3B1829 /* QuickVisionIntent.swift */; };
+		AN2001000000000001 /* AudioNoteModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1001000000000001 /* AudioNoteModels.swift */; };
+		AN2002000000000002 /* AudioNoteStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1002000000000002 /* AudioNoteStorage.swift */; };
+		AN2003000000000003 /* AudioNoteRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1003000000000003 /* AudioNoteRecorder.swift */; };
+		AN2004000000000004 /* AudioNoteTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1004000000000004 /* AudioNoteTranscriptionService.swift */; };
+		AN2005000000000005 /* AudioNoteViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1005000000000005 /* AudioNoteViewModel.swift */; };
+		AN2006000000000006 /* AudioNoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1006000000000006 /* AudioNoteView.swift */; };
+		AN2007000000000007 /* AudioNoteRecordsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1007000000000007 /* AudioNoteRecordsView.swift */; };
+		AN2008000000000008 /* AudioNoteSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1008000000000008 /* AudioNoteSettingsView.swift */; };
+		AR0002000200020002 /* AppRouteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AR0001000100010001 /* AppRouteManager.swift */; };
 		B3F7AF9C18583263BE4D96A1 /* LanguageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0080AFEB87FC4CF85E53FE97 /* LanguageManager.swift */; };
 		D83E4BD577765733E71A0068 /* QuickVisionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B037E0156E90DE2314A9F47 /* QuickVisionView.swift */; };
+		F02609070000000000000012 /* GlassesDeviceStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609070000000000000011 /* GlassesDeviceStatus.swift */; };
+		F02609070000000000000022 /* HomeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609070000000000000021 /* HomeDashboardView.swift */; };
+		F02609080000000000000011 /* RecordEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609080000000000000001 /* RecordEntry.swift */; };
+		F02609080000000000000012 /* RecordsLibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02609080000000000000002 /* RecordsLibraryViewModel.swift */; };
+		F026090800000000000000A1 /* WayfarerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F026090800000000000000A2 /* WayfarerView.swift */; };
+		F026090800000000000000A3 /* Wayfarer.usdz in Resources */ = {isa = PBXBuildFile; fileRef = F026090800000000000000A4 /* Wayfarer.usdz */; };
+		F026090900000000000000B1 /* WayfarerHome.usdz in Resources */ = {isa = PBXBuildFile; fileRef = F026090900000000000000B2 /* WayfarerHome.usdz */; };
+		F0260909000000000000EA01 /* LeanEatStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0260909000000000000EA02 /* LeanEatStorage.swift */; };
 		LT0001000100010001 /* LiveTranslateModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = LT1001000100010001 /* LiveTranslateModels.swift */; };
 		LT0002000200020002 /* LiveTranslateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = LT1002000200020002 /* LiveTranslateService.swift */; };
 		LT0003000300030003 /* LiveTranslateViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = LT1003000300030003 /* LiveTranslateViewModel.swift */; };
@@ -103,14 +112,6 @@
 		OC1005000500050005 /* OpenClawDeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = OC2005000500050005 /* OpenClawDeviceIdentity.swift */; };
 		OC1006000600060006 /* OpenClawChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OC2006000600060006 /* OpenClawChatView.swift */; };
 		OC1007000700070007 /* OpenClawASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = OC2007000700070007 /* OpenClawASRService.swift */; };
-		AN2001000000000001 /* AudioNoteModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1001000000000001 /* AudioNoteModels.swift */; };
-		AN2002000000000002 /* AudioNoteStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1002000000000002 /* AudioNoteStorage.swift */; };
-		AN2003000000000003 /* AudioNoteRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1003000000000003 /* AudioNoteRecorder.swift */; };
-		AN2004000000000004 /* AudioNoteTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1004000000000004 /* AudioNoteTranscriptionService.swift */; };
-		AN2005000000000005 /* AudioNoteViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1005000000000005 /* AudioNoteViewModel.swift */; };
-		AN2006000000000006 /* AudioNoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1006000000000006 /* AudioNoteView.swift */; };
-		AN2007000000000007 /* AudioNoteRecordsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1007000000000007 /* AudioNoteRecordsView.swift */; };
-		AN2008000000000008 /* AudioNoteSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AN1008000000000008 /* AudioNoteSettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -137,13 +138,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
- F026090900000000000000B2 = {isa = PBXFileReference; lastKnownFileType = file; name = WayfarerHome.usdz; path = CameraAccess/Resources/Models/WayfarerHome.usdz; sourceTree = SOURCE_ROOT; };
- F026090800000000000000A2 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WayfarerView.swift; sourceTree = "<group>"; };
- F026090800000000000000A4 = {isa = PBXFileReference; lastKnownFileType = file; name = Wayfarer.usdz; path = CameraAccess/Resources/Models/Wayfarer.usdz; sourceTree = SOURCE_ROOT; };
-		F02609080000000000000002 /* RecordsLibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsLibraryViewModel.swift; sourceTree = "<group>"; };
-		F02609080000000000000001 /* RecordEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordEntry.swift; sourceTree = "<group>"; };
-		F02609070000000000000021 /* HomeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDashboardView.swift; sourceTree = "<group>"; };
-		F02609070000000000000011 /* GlassesDeviceStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassesDeviceStatus.swift; sourceTree = "<group>"; };
 		0080AFEB87FC4CF85E53FE97 /* LanguageManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LanguageManager.swift; path = Managers/LanguageManager.swift; sourceTree = "<group>"; };
 		069172850B30A2766C8BD4B5 /* TTSService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TTSService.swift; sourceTree = "<group>"; };
 		1111827A1CF7A278A6DC6934 /* APIProviderManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = APIProviderManager.swift; path = Managers/APIProviderManager.swift; sourceTree = "<group>"; };
@@ -216,11 +210,27 @@
 		8FD96B7B2E6F0A9800F56AB1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000001 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000002 /* Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.example.xcconfig; sourceTree = "<group>"; };
+		AN1001000000000001 /* AudioNoteModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteModels.swift; sourceTree = "<group>"; };
+		AN1002000000000002 /* AudioNoteStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteStorage.swift; sourceTree = "<group>"; };
+		AN1003000000000003 /* AudioNoteRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteRecorder.swift; sourceTree = "<group>"; };
+		AN1004000000000004 /* AudioNoteTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteTranscriptionService.swift; sourceTree = "<group>"; };
+		AN1005000000000005 /* AudioNoteViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteViewModel.swift; sourceTree = "<group>"; };
+		AN1006000000000006 /* AudioNoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteView.swift; sourceTree = "<group>"; };
+		AN1007000000000007 /* AudioNoteRecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteRecordsView.swift; sourceTree = "<group>"; };
+		AN1008000000000008 /* AudioNoteSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteSettingsView.swift; sourceTree = "<group>"; };
+		AR0001000100010001 /* AppRouteManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppRouteManager.swift; path = Managers/AppRouteManager.swift; sourceTree = "<group>"; };
 		C7F490219E64EC144DAF8A8C /* QuickVisionStorage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickVisionStorage.swift; sourceTree = "<group>"; };
 		CA3E36CE337855A7F17F2AC8 /* QuickVisionService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickVisionService.swift; sourceTree = "<group>"; };
 		DC72379319F7F8AAF8019018 /* LiveAIManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiveAIManager.swift; path = Managers/LiveAIManager.swift; sourceTree = "<group>"; };
-		AR0001000100010001 /* AppRouteManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppRouteManager.swift; path = Managers/AppRouteManager.swift; sourceTree = "<group>"; };
 		E699CC952E8150670052C240 /* CameraAccessTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CameraAccessTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F02609070000000000000011 /* GlassesDeviceStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassesDeviceStatus.swift; sourceTree = "<group>"; };
+		F02609070000000000000021 /* HomeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDashboardView.swift; sourceTree = "<group>"; };
+		F02609080000000000000001 /* RecordEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordEntry.swift; sourceTree = "<group>"; };
+		F02609080000000000000002 /* RecordsLibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsLibraryViewModel.swift; sourceTree = "<group>"; };
+		F026090800000000000000A2 /* WayfarerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WayfarerView.swift; sourceTree = "<group>"; };
+		F026090800000000000000A4 /* Wayfarer.usdz */ = {isa = PBXFileReference; lastKnownFileType = file; name = Wayfarer.usdz; path = CameraAccess/Resources/Models/Wayfarer.usdz; sourceTree = SOURCE_ROOT; };
+		F026090900000000000000B2 /* WayfarerHome.usdz */ = {isa = PBXFileReference; lastKnownFileType = file; name = WayfarerHome.usdz; path = CameraAccess/Resources/Models/WayfarerHome.usdz; sourceTree = SOURCE_ROOT; };
+		F0260909000000000000EA02 /* LeanEatStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeanEatStorage.swift; sourceTree = "<group>"; };
 		LT1001000100010001 /* LiveTranslateModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslateModels.swift; sourceTree = "<group>"; };
 		LT1002000200020002 /* LiveTranslateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslateService.swift; sourceTree = "<group>"; };
 		LT1003000300030003 /* LiveTranslateViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslateViewModel.swift; sourceTree = "<group>"; };
@@ -234,14 +244,6 @@
 		OC2005000500050005 /* OpenClawDeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawDeviceIdentity.swift; sourceTree = "<group>"; };
 		OC2006000600060006 /* OpenClawChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawChatView.swift; sourceTree = "<group>"; };
 		OC2007000700070007 /* OpenClawASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawASRService.swift; sourceTree = "<group>"; };
-		AN1001000000000001 /* AudioNoteModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteModels.swift; sourceTree = "<group>"; };
-		AN1002000000000002 /* AudioNoteStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteStorage.swift; sourceTree = "<group>"; };
-		AN1003000000000003 /* AudioNoteRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteRecorder.swift; sourceTree = "<group>"; };
-		AN1004000000000004 /* AudioNoteTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteTranscriptionService.swift; sourceTree = "<group>"; };
-		AN1005000000000005 /* AudioNoteViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteViewModel.swift; sourceTree = "<group>"; };
-		AN1006000000000006 /* AudioNoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteView.swift; sourceTree = "<group>"; };
-		AN1007000000000007 /* AudioNoteRecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteRecordsView.swift; sourceTree = "<group>"; };
-		AN1008000000000008 /* AudioNoteSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioNoteSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -319,6 +321,7 @@
 				4B69CCC62F050D5D00D1D025 /* RTMPStreamingService.swift */,
 				4BA57A8D2EF8227E002EC214 /* ConversationStorage.swift */,
 				4BA57A8E2EF8227E002EC214 /* LeanEatService.swift */,
+				F0260909000000000000EA02 /* LeanEatStorage.swift */,
 				4BA57A8F2EF8227E002EC214 /* OmniRealtimeService.swift */,
 				4BA57A902EF8227E002EC214 /* VisionAPIConfig.swift */,
 				4BA57A912EF8227E002EC214 /* VisionAPIService.swift */,
@@ -403,9 +406,8 @@
 			isa = PBXGroup;
 			children = (
 				F02609070000000000000021 /* HomeDashboardView.swift */,
- F026090800000000000000A2,
- F026090800000000000000A4,
- F026090900000000000000B2,
+				F026090800000000000000A2 /* WayfarerView.swift */,
+				F026090800000000000000A4 /* Wayfarer.usdz */,
 				AN1006000000000006 /* AudioNoteView.swift */,
 				AN1007000000000007 /* AudioNoteRecordsView.swift */,
 				AN1008000000000008 /* AudioNoteSettingsView.swift */,
@@ -459,7 +461,16 @@
 				8F2A14F12DDBCEB900D4E5F2 /* Frameworks */,
 				7A7A7A7A7A7A7A7A7A7A7A7A /* Products */,
 				E699CC962E8150670052C240 /* CameraAccessTests */,
+				5DA9D05230515FBA00492AE8 /* Recovered References */,
 			);
+			sourceTree = "<group>";
+		};
+		5DA9D05230515FBA00492AE8 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				F026090900000000000000B2 /* WayfarerHome.usdz */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 		7A7A7A7A7A7A7A7A7A7A7A7A /* Products */ = {
@@ -608,8 +619,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
- F026090800000000000000A3,
- F026090900000000000000B1,
+				F026090800000000000000A3 /* Wayfarer.usdz in Resources */,
+				F026090900000000000000B1 /* WayfarerHome.usdz in Resources */,
 				4BA57AF02EF8227E002EC214 /* Localizable.strings in Resources */,
 				4BA57AF12EF8227E002EC214 /* Localizable.strings in Resources */,
 				8FD96B8D2E6F0A9800F56AB1 /* Assets.xcassets in Resources */,
@@ -633,7 +644,7 @@
 				F02609080000000000000012 /* RecordsLibraryViewModel.swift in Sources */,
 				F02609080000000000000011 /* RecordEntry.swift in Sources */,
 				F02609070000000000000022 /* HomeDashboardView.swift in Sources */,
- F026090800000000000000A1,
+				F026090800000000000000A1 /* WayfarerView.swift in Sources */,
 				F02609070000000000000012 /* GlassesDeviceStatus.swift in Sources */,
 				AN2001000000000001 /* AudioNoteModels.swift in Sources */,
 				AN2002000000000002 /* AudioNoteStorage.swift in Sources */,
@@ -662,6 +673,7 @@
 				4BA57AD02EF8227E002EC214 /* APIKeyManager.swift in Sources */,
 				4BA57AD12EF8227E002EC214 /* RegistrationView.swift in Sources */,
 				4BA57AD22EF8227E002EC214 /* LeanEatService.swift in Sources */,
+				F0260909000000000000EA01 /* LeanEatStorage.swift in Sources */,
 				4BA57AD32EF8227E002EC214 /* MainTabView.swift in Sources */,
 				4BA57AD42EF8227E002EC214 /* LiveAIView.swift in Sources */,
 				4BA57AD52EF8227E002EC214 /* MainAppView.swift in Sources */,

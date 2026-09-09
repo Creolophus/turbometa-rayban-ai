@@ -84,6 +84,37 @@ class StreamSessionViewModel: ObservableObject {
   private var deviceStatusGeneration = UUID()
   private var deviceMonitorTask: Task<Void, Never>?
   private var isProcessingFrame = false
+  private var captureContinuation: CheckedContinuation<Data, Error>?
+  private var isolatedCapture = false
+  private var sessionGeneration = UUID()
+
+  /// LeanEat owns this instance and never publishes a legacy photo-preview sheet.
+  func makePhotoSession() -> StreamSessionViewModel {
+    let model = StreamSessionViewModel(wearables: wearables)
+    model.isolatedCapture = true
+    return model
+  }
+
+  func capturePhotoData() async throws -> Data {
+    guard streamingStatus == .streaming, streamSession != nil, captureContinuation == nil else {
+      throw LeanEatError.camera
+    }
+    return try await withTaskCancellationHandler {
+      try Task.checkCancellation()
+      return try await withCheckedThrowingContinuation { continuation in
+        captureContinuation = continuation
+        streamSession?.capturePhoto(format: .jpeg)
+      }
+    } onCancel: {
+      Task { @MainActor [weak self] in self?.cancelPhotoCapture() }
+    }
+  }
+
+  func cancelPhotoCapture() {
+    let pending = captureContinuation
+    captureContinuation = nil
+    pending?.resume(throwing: CancellationError())
+  }
 
   init(
     wearables: WearablesInterface,
@@ -164,17 +195,19 @@ class StreamSessionViewModel: ObservableObject {
   }
 
   private func configureStreamListeners(_ streamSession: StreamSession) {
+    let generation = sessionGeneration
     stateListenerToken = streamSession.statePublisher.listen { [weak self] state in
       Task { @MainActor [weak self] in
         logger.info("📊 State changed: \(String(describing: state))")
-        self?.updateStatusFromState(state)
+        guard let self, self.sessionGeneration == generation else { return }
+        self.updateStatusFromState(state)
       }
     }
 
     // Subscribe to video frames (skip if previous frame still processing)
     videoFrameListenerToken = streamSession.videoFramePublisher.listen { [weak self] videoFrame in
       Task { @MainActor [weak self] in
-        guard let self, !self.isProcessingFrame else { return }
+        guard let self, self.sessionGeneration == generation, !self.isProcessingFrame else { return }
         self.isProcessingFrame = true
         defer { self.isProcessingFrame = false }
 
@@ -191,7 +224,7 @@ class StreamSessionViewModel: ObservableObject {
     // Subscribe to errors
     errorListenerToken = streamSession.errorPublisher.listen { [weak self] error in
       Task { @MainActor [weak self] in
-        guard let self else { return }
+        guard let self, self.sessionGeneration == generation else { return }
         logger.error("❌ Stream error: \(String(describing: error))")
         let newErrorMessage = formatStreamingError(error)
         if newErrorMessage != self.errorMessage {
@@ -203,7 +236,13 @@ class StreamSessionViewModel: ObservableObject {
     // Subscribe to photo capture
     photoDataListenerToken = streamSession.photoDataPublisher.listen { [weak self] photoData in
       Task { @MainActor [weak self] in
-        guard let self else { return }
+        guard let self, self.sessionGeneration == generation else { return }
+        if self.isolatedCapture {
+          let pending = self.captureContinuation
+          self.captureContinuation = nil
+          pending?.resume(returning: photoData.data)
+          return
+        }
         logger.info("📸 Photo captured - size: \(photoData.data.count) bytes")
         if let uiImage = UIImage(data: photoData.data) {
           self.capturedPhoto = uiImage
@@ -220,12 +259,14 @@ class StreamSessionViewModel: ObservableObject {
     let permission = Permission.camera
     do {
       let status = try await wearables.checkPermissionStatus(permission)
+      guard !Task.isCancelled else { return }
       logger.info("▶️ Permission status: \(String(describing: status))")
       if status == .granted {
         await startSession()
         return
       }
       let requestStatus = try await wearables.requestPermission(permission)
+      guard !Task.isCancelled else { return }
       logger.info("▶️ Permission request result: \(String(describing: requestStatus))")
       if requestStatus == .granted {
         await startSession()
@@ -239,6 +280,7 @@ class StreamSessionViewModel: ObservableObject {
   }
 
   func startSession() async {
+    guard !Task.isCancelled else { return }
     logger.info("🚀 startSession START")
 
     if deviceSession != nil {
@@ -249,6 +291,7 @@ class StreamSessionViewModel: ObservableObject {
       // DeviceSession instances cannot be restarted after reaching .stopped.
       await releaseSessionResources()
     }
+    guard !Task.isCancelled else { return }
 
     // Reset to unlimited time when starting a new stream
     activeTimeLimit = .noLimit
@@ -259,25 +302,31 @@ class StreamSessionViewModel: ObservableObject {
     hasReceivedFirstFrame = false
 
     streamingStatus = .waiting
+    sessionGeneration = UUID()
+    let generation = sessionGeneration
 
     do {
       let newDeviceSession = try wearables.createSession(deviceSelector: deviceSelector)
       deviceSession = newDeviceSession
       deviceSessionErrorListenerToken = newDeviceSession.errorPublisher.listen { [weak self] error in
         Task { @MainActor [weak self] in
+          guard let self, self.sessionGeneration == generation else { return }
           logger.error("❌ Device session error: \(String(describing: error))")
-          self?.showError(error.localizedDescription)
+          self.showError(error.localizedDescription)
         }
       }
 
       try newDeviceSession.start()
       if newDeviceSession.state != .started {
         for await state in newDeviceSession.stateStream() {
+          guard !Task.isCancelled, sessionGeneration == generation else { return }
           logger.info("📱 Device session state: \(String(describing: state))")
           if state == .started { break }
           if state == .stopped { throw SessionSetupError.deviceSessionStopped }
         }
       }
+
+      guard !Task.isCancelled, sessionGeneration == generation else { return }
 
       guard let newStreamSession = try newDeviceSession.addStream(config: streamConfig) else {
         throw SessionSetupError.streamUnavailable
@@ -289,6 +338,7 @@ class StreamSessionViewModel: ObservableObject {
       await newStreamSession.start()
       logger.info("🚀 startSession END - stream.start() returned")
     } catch {
+      guard sessionGeneration == generation else { return }
       logger.error("❌ Session setup failed: \(error.localizedDescription)")
       showError(error.localizedDescription)
       await releaseSessionResources()
@@ -407,10 +457,10 @@ class StreamSessionViewModel: ObservableObject {
   }
 
   private func releaseSessionResources() async {
-    if let streamSession {
-      await streamSession.stop()
-    }
-    deviceSession?.stop()
+    sessionGeneration = UUID()
+    cancelPhotoCapture()
+    let oldStream = streamSession
+    let oldDevice = deviceSession
 
     stateListenerToken = nil
     videoFrameListenerToken = nil
@@ -421,5 +471,8 @@ class StreamSessionViewModel: ObservableObject {
     deviceSession = nil
     currentVideoFrame = nil
     streamingStatus = .stopped
+    hasReceivedFirstFrame = false
+    if let oldStream { await oldStream.stop() }
+    oldDevice?.stop()
   }
 }

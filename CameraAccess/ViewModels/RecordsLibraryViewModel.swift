@@ -9,6 +9,7 @@ extension Notification.Name {
 struct RecordsLibraryStore {
     var load: () -> [RecordEntry]
     var delete: ([RecordEntry]) -> Void
+    var deleteFood: (Set<UUID>) async throws -> Void = { try await LeanEatStorage.shared.delete(ids: $0) }
 
     static var live: RecordsLibraryStore {
         RecordsLibraryStore(load: {
@@ -16,6 +17,7 @@ struct RecordsLibraryStore {
                 + TranslationSessionBuilder.group(records: LiveTranslateHistoryStorage.shared.loadAll()).map(RecordEntry.translation)
                 + AudioNoteStorage.shared.loadAll().map(RecordEntry.audioNote)
                 + QuickVisionStorage.shared.loadAllRecords().map(RecordEntry.quickVision)
+                + LeanEatStorage.shared.loadAll().map(RecordEntry.leanEat)
         }, delete: { entries in
             var translationIDs = Set<UUID>()
             for entry in entries {
@@ -24,6 +26,7 @@ struct RecordsLibraryStore {
                 case .translation(let session): translationIDs.formUnion(session.records.map(\.id))
                 case .audioNote(let note): AudioNoteLibrary.shared.delete(note.id)
                 case .quickVision(let record): QuickVisionStorage.shared.deleteRecord(record.id)
+                case .leanEat: break // Photo packages are deleted asynchronously by the view model.
                 }
             }
             if !translationIDs.isEmpty {
@@ -91,10 +94,27 @@ final class RecordsLibraryViewModel: ObservableObject {
     }
 
     func delete(ids: Set<RecordEntryID>) {
+        guard !isDeleting else { return }
         // Resolve current sessions again so deletion includes turns appended since selection.
         reload()
         let targets = entries.filter { ids.contains($0.id) }
         isDeleting = true
+        let foodIDs = Set(targets.compactMap { entry -> UUID? in
+            if case .leanEat(let record) = entry { return record.id }
+            return nil
+        })
+        if !foodIDs.isEmpty {
+            Task {
+                do { try await store.deleteFood(foodIDs) }
+                catch { deletionFailed = true }
+                finishDeleting(targets: targets, ids: ids)
+            }
+            return
+        }
+        finishDeleting(targets: targets, ids: ids)
+    }
+
+    private func finishDeleting(targets: [RecordEntry], ids: Set<RecordEntryID>) {
         store.delete(targets)
         isDeleting = false
         reload()

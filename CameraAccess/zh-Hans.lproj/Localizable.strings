@@ -98,6 +98,37 @@
 "photo.saved" = "已保存";
 
 // MARK: - LeanEat (Nutrition Analysis)
+"leaneat.configError" = "请先在设置中配置视觉服务及 API Key";
+"leaneat.imageError" = "无法读取这张照片，请重新选择";
+"leaneat.responseError" = "营养结果格式异常，请重试";
+"leaneat.timeout" = "等待超时，请重试";
+"leaneat.cameraError" = "无法使用眼镜相机，请检查连接与相机权限，或从相册选择";
+"leaneat.httpError" = "分析服务暂不可用（%d），请检查服务配置或稍后重试";
+"leaneat.foodPhoto" = "本次分析的食物照片";
+"leaneat.analyzingHint" = "正在识别食物与估算份量";
+"leaneat.saveFailed" = "分析已完成，但尚未保存到记录。请重试保存。";
+"leaneat.unsavedTitle" = "结果尚未保存";
+"leaneat.unsavedMessage" = "离开后将无法找回本次结果，可以重试保存或放弃本次结果。";
+"leaneat.retrySave" = "重试保存";
+"leaneat.discard" = "放弃本次结果";
+"leaneat.connecting" = "正在连接眼镜相机";
+"leaneat.capturing" = "正在拍照";
+"leaneat.loadingPhoto" = "正在准备照片";
+"leaneat.saving" = "正在保存";
+"leaneat.saved" = "已保存到记录";
+"leaneat.another" = "再分析一餐";
+"leaneat.reselect" = "重新选择";
+"leaneat.capture" = "拍照分析";
+"leaneat.reconnect" = "重新连接";
+"leaneat.library" = "从相册选择";
+"leaneat.canClose" = "可随时关闭并取消本次分析";
+"leaneat.noGlasses" = "暂无眼镜画面";
+"leaneat.noGlassesHint" = "连接眼镜后拍照，或从相册选择食物照片";
+"leaneat.frameHint" = "将食物放入画面";
+"leaneat.estimatedCalories" = "估算总热量";
+"leaneat.macros" = "蛋白质 %.1fg · 脂肪 %.1fg · 碳水 %.1fg";
+"leaneat.estimateHint" = "营养数据为图片估算";
+"leaneat.noFood" = "未识别到食物，请重新拍摄或选择清晰的食物照片";
 "leaneat.title" = "营养分析";
 "leaneat.analyzing" = "分析中...";
 "leaneat.healthscore" = "健康评分";

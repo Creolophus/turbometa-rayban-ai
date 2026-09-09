@@ -7,7 +7,7 @@ import Foundation
 
 // MARK: - Food Nutrition Response
 
-struct FoodNutritionResponse: Codable {
+struct FoodNutritionResponse: Codable, Sendable {
     let foods: [FoodItem]
     let totalCalories: Int
     let totalProtein: Double
@@ -29,7 +29,7 @@ struct FoodNutritionResponse: Codable {
 
 // MARK: - Food Item
 
-struct FoodItem: Codable, Identifiable {
+struct FoodItem: Codable, Identifiable, Sendable {
     let id = UUID()
     let name: String
     let portion: String
@@ -67,6 +67,15 @@ struct FoodItem: Codable, Identifiable {
 // MARK: - Nutrition Summary
 
 extension FoodNutritionResponse {
+    func validate() throws {
+        guard (0...100).contains(healthScore), totalCalories >= 0,
+              [totalProtein, totalFat, totalCarbs].allSatisfy({ $0.isFinite && $0 >= 0 }),
+              foods.allSatisfy({ food in
+                  !food.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && food.calories >= 0 &&
+                  [food.protein, food.fat, food.carbs, food.fiber ?? 0, food.sugar ?? 0].allSatisfy { $0.isFinite && $0 >= 0 }
+              }) else { throw CocoaError(.coderInvalidValue) }
+    }
+
     var formattedTotalCalories: String {
         "\(totalCalories) 千卡"
     }
@@ -106,4 +115,15 @@ extension FoodNutritionResponse {
             return "需要改善"
         }
     }
+}
+
+struct LeanEatRecord: Codable, Identifiable, Sendable {
+    enum Source: String, Codable, Sendable { case glasses, library }
+    let id: UUID
+    let timestamp: Date
+    let source: Source
+    let imagePath: String
+    let nutrition: FoodNutritionResponse
+
+    var title: String { nutrition.foods.map(\.name).joined(separator: "、") }
 }

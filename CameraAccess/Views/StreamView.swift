@@ -66,6 +66,16 @@ struct StreamView: View {
       }
       }
     }
+    .overlay(alignment: .topTrailing) {
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark").frame(width: 44, height: 44)
+          .foregroundStyle(.white).background(.black.opacity(0.5), in: Circle())
+      }
+      .accessibilityLabel("close".localized)
+      .padding(20)
+    }
     .onAppear {
       // 只有设备连接时才启动视频流
       guard viewModel.hasActiveDevice else {
@@ -118,12 +128,14 @@ struct StreamView: View {
       }
     }
     // Show LeanEat nutrition analysis view
-    .sheet(isPresented: $viewModel.showLeanEat) {
+    .sheet(isPresented: $viewModel.showLeanEat, onDismiss: {
+      viewModel.capturedPhoto = nil
+    }) {
       if let photo = viewModel.capturedPhoto {
         LeanEatView(
-          photo: photo,
-          apiKey: VisionAPIConfig.apiKey
+          photo: photo
         )
+        .task { await viewModel.stopSession() }
       }
     }
     // Show Omni Realtime Chat view

@@ -280,6 +280,8 @@ struct RecordsView: View {
             AudioNoteDetailView(noteID: note.id) { model.reload(); detail = nil }
         case .quickVision(let record):
             QuickVisionRecordDetailView(record: record)
+        case .leanEat(let record):
+            LeanEatRecordDetailView(record: record)
         }
     }
 }
@@ -316,6 +318,7 @@ private struct RecordArchiveRow: View {
         case .translation: return HomeStyle.violet
         case .audioNote: return .orange
         case .quickVision: return .teal
+        case .leanEat: return .green
         }
     }
 
@@ -325,6 +328,7 @@ private struct RecordArchiveRow: View {
         case .translation: return "character.bubble"
         case .audioNote: return "waveform"
         case .quickVision: return "eye"
+        case .leanEat: return "leaf"
         }
     }
 
@@ -380,6 +384,8 @@ private struct RecordArchiveRow: View {
     @ViewBuilder private var artwork: some View {
         if case .quickVision(let record) = entry, let image = record.thumbnail {
             Image(uiImage: image).resizable().scaledToFill()
+        } else if case .leanEat(let record) = entry {
+            LeanEatStoredPhoto(record: record)
         } else {
             RoundedRectangle(cornerRadius: 12)
                 .fill(tint.gradient)
