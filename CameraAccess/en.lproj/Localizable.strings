@@ -384,9 +384,6 @@
 "livetranslate.finalizing" = "Finishing the last sentence…";
 "livetranslate.playing" = "Playing translation";
 "livetranslate.pending" = "· %d queued";
-"livetranslate.vision.title" = "Vision Enhancement";
-"livetranslate.vision.off" = "Off; no frames are read or uploaded";
-"livetranslate.vision.on" = "Uploads 1 latest glasses frame per speech turn";
 
 // Translation session history
 "records.translation.empty" = "No translation sessions";
@@ -411,8 +408,6 @@
 "livetranslate.settings.output" = "Output Settings";
 "livetranslate.settings.audioOutput" = "Audio Output";
 "livetranslate.settings.audioOutput.footer" = "Cantonese and Greek targets support text only";
-"livetranslate.settings.imageEnhance" = "Visual Enhancement";
-"livetranslate.settings.imageEnhance.footer" = "Enable visual enhancement to improve translation accuracy for homophones";
 "livetranslate.settings.history" = "Translation History";
 "livetranslate.settings.clearHistory" = "Clear History";
 "livetranslate.settings.clearHistory.confirm.title" = "Clear translation history?";
@@ -625,3 +620,23 @@
 "glasses.zoom.out" = "Zoom out";
 "glasses.close" = "Close";
 "glasses.fullscreen.hint" = "Drag to rotate · Pinch to zoom";
+
+"livetranslate.state.recognizing" = "Recognizing";
+"livetranslate.state.translating" = "Translating";
+"livetranslate.state.confirming" = "Confirming result";
+"livetranslate.state.completed" = "Completed";
+"livetranslate.state.failed" = "Recognition or translation failed";
+"livetranslate.state.incomplete" = "Incomplete result";
+"livetranslate.state.empty" = "No translation returned";
+"livetranslate.state.timedOut" = "Timed out";
+"livetranslate.state.unlinked" = "Source and translation not linked";
+"livetranslate.saveFailed" = "Could not save translation history. Results remain on this page; please try again.";
+"livetranslate.retrySave" = "Retry saving";
+
+"livetranslate.close" = "Close";
+
+"livetranslate.swap" = "Swap languages";
+
+"livetranslate.startAction" = "Start translation";
+
+"livetranslate.stopAction" = "Stop translation";

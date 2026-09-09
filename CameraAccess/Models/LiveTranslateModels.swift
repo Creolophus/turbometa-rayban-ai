@@ -145,6 +145,12 @@ enum TranslateVoice: String, CaseIterable, Codable, Identifiable {
 
 // MARK: - 翻译记录
 
+enum TranslationTurnStatus: String, Codable {
+    case recognizing, translating, confirming, completed, failed, incomplete, empty, timedOut, unlinked
+    var isTerminal: Bool { ![Self.recognizing, .translating, .confirming].contains(self) }
+    var label: String { ("livetranslate.state." + rawValue).localized }
+}
+
 struct TranslateRecord: Codable, Identifiable {
     let id: UUID
     let timestamp: Date
@@ -153,6 +159,7 @@ struct TranslateRecord: Codable, Identifiable {
     let responseID: String?
     let sourceLanguage: TranslateLanguage
     let targetLanguage: TranslateLanguage
+    var status: TranslationTurnStatus? = nil
     let originalText: String      // 识别的原文
     let translatedText: String    // 翻译结果
 
@@ -293,6 +300,8 @@ struct TranslationTurnSnapshot: Identifiable, Equatable {
     /// Creation order controls source-card display only. It is intentionally
     /// never used to associate or persist a bilingual record.
     let creationIndex: Int
+    var status: TranslationTurnStatus = .translating
+    var timestamp: Date = Date()
 }
 
 /// A coordinator snapshot is deliberately richer than what the live list
@@ -305,6 +314,10 @@ struct TranslationDisplayTurn: Identifiable, Equatable {
     let translatedText: String
     let isSourceFinal: Bool
     let isTranslationFinal: Bool
+    var status: TranslationTurnStatus = .translating
+    var timestamp: Date = Date()
+    var sourceLanguage: TranslateLanguage = .en
+    var targetLanguage: TranslateLanguage = .zh
 }
 
 enum TranslationPlaybackState: Equatable {
@@ -479,16 +492,20 @@ struct TranslationTurnCoordinator {
         let creationIndex: Int
         var text = ""
         var isFinal = false
+        var failed = false
         var timestamp = Date()
+        var updatedAt = Date()
     }
 
     private struct ResponseState {
+        let recordID = UUID()
         let responseID: String
         let creationIndex: Int
         var assistantItemID: String?
         var text = ""
         var isFinal = false
         var isResponseDone = false
+        var status: String?
         var timestamp = Date()
     }
 
@@ -500,6 +517,9 @@ struct TranslationTurnCoordinator {
     private var responses: [String: ResponseState] = [:]
     private var sourceItemIDByAssistantItemID: [String: String] = [:]
     private var nextCreationIndex = 0
+    private var sealed = false
+    private var now = Date()
+    private var responseBySource: [String: String] = [:]
 
     init(
         sessionID: UUID = UUID(),
@@ -542,7 +562,7 @@ struct TranslationTurnCoordinator {
         }
         source.text = event.displayText.trimmingCharacters(in: .whitespacesAndNewlines)
         source.isFinal = source.isFinal || event.isFinal
-        source.timestamp = Date()
+        source.updatedAt = Date()
         sources[sourceID] = source
         return makeUpdate()
     }
@@ -563,6 +583,7 @@ struct TranslationTurnCoordinator {
         response.isFinal = response.isFinal || event.isFinal
         response.timestamp = Date()
         responses[event.responseID] = response
+        rebuildLinks()
         return makeUpdate()
     }
 
@@ -572,10 +593,11 @@ struct TranslationTurnCoordinator {
         return makeUpdate()
     }
 
-    mutating func receiveResponseFinished(responseID: String) -> TranslationCoordinatorUpdate {
+    mutating func receiveResponseFinished(responseID: String, status: String = "completed") -> TranslationCoordinatorUpdate {
         guard !responseID.isEmpty else { return makeUpdate() }
         ensureResponse(responseID: responseID)
         responses[responseID]?.isResponseDone = true
+        responses[responseID]?.status = status
         // response.done is not a transcript completion event. Do not modify
         // `isFinal` here; audio_transcript.done/text.done owns that state.
         return makeUpdate()
@@ -587,6 +609,7 @@ struct TranslationTurnCoordinator {
         guard !responseID.isEmpty, !itemID.isEmpty else { return makeUpdate() }
         ensureResponse(responseID: responseID)
         responses[responseID]?.assistantItemID = itemID
+        rebuildLinks()
         return makeUpdate()
     }
 
@@ -596,13 +619,37 @@ struct TranslationTurnCoordinator {
         guard !sourceItemID.isEmpty, !responseItemID.isEmpty else { return makeUpdate() }
         _ = ensureSource(itemID: sourceItemID)
         sourceItemIDByAssistantItemID[responseItemID] = sourceItemID
+        rebuildLinks()
         return makeUpdate()
     }
 
-    /// A session can only persist fully linked, fully completed bilingual
-    /// turns. Unlinked responses are intentionally omitted from the update.
+    /// Seal remaining rows as explicitly incomplete; preserve received text
+    /// without claiming a successful bilingual translation or guessing links.
     mutating func finalize() -> TranslationCoordinatorUpdate {
-        makeUpdate()
+        sealed = true
+        return makeUpdate()
+    }
+
+    mutating func receiveSourceFailure(itemID: String) -> TranslationCoordinatorUpdate {
+        ensureSource(itemID: itemID)
+        sources[itemID]?.failed = true
+        return makeUpdate()
+    }
+
+    mutating func tick(at date: Date = Date()) -> TranslationCoordinatorUpdate {
+        now = date
+        return makeUpdate()
+    }
+
+    private mutating func rebuildLinks() {
+        responseBySource.removeAll(keepingCapacity: true)
+        for response in responses.values {
+            guard let item = response.assistantItemID,
+                  let source = sourceItemIDByAssistantItemID[item] else { continue }
+            if let existing = responseBySource[source], let old = responses[existing],
+               old.creationIndex > response.creationIndex { continue }
+            responseBySource[source] = response.responseID
+        }
     }
 
     @discardableResult
@@ -635,21 +682,19 @@ struct TranslationTurnCoordinator {
     }
 
     private func linkedResponse(for sourceItemID: String) -> ResponseState? {
-        responses.values
-            .filter { response in
-                guard let assistantItemID = response.assistantItemID,
-                      let linkedSourceID = sourceItemIDByAssistantItemID[assistantItemID] else {
-                    return false
-                }
-                return linkedSourceID == sourceItemID
-            }
-            .sorted {
-                if $0.creationIndex != $1.creationIndex {
-                    return $0.creationIndex < $1.creationIndex
-                }
-                return $0.responseID < $1.responseID
-            }
-            .first
+        responseBySource[sourceItemID].flatMap { responses[$0] }
+    }
+
+    private func state(source: SourceState, response: ResponseState?) -> TranslationTurnStatus {
+        if source.failed { return .failed }
+        if let status = response?.status, status != "completed" { return status == "failed" ? .failed : .incomplete }
+        if source.isFinal, let response, response.isFinal, response.isResponseDone {
+            return response.text.isEmpty ? .empty : (source.text.isEmpty ? .incomplete : .completed)
+        }
+        if sealed { return response == nil ? .unlinked : .incomplete }
+        if now.timeIntervalSince(max(source.updatedAt, response?.timestamp ?? source.updatedAt)) > 30 { return .timedOut }
+        if response?.isFinal == true { return .confirming }
+        return source.isFinal ? .translating : .recognizing
     }
 
     private func makeUpdate() -> TranslationCoordinatorUpdate {
@@ -661,7 +706,8 @@ struct TranslationTurnCoordinator {
             let response = linkedResponse(for: sourceID)
             // Never expose a translation-only card. A source card may remain
             // provisional while the authoritative assistant link is pending.
-            guard !source.text.isEmpty else { continue }
+            guard !source.text.isEmpty || source.failed || !(response?.text.isEmpty ?? true) else { continue }
+            let status = state(source: source, response: response)
 
             let snapshot = TranslationTurnSnapshot(
                 id: source.recordID,
@@ -671,31 +717,46 @@ struct TranslationTurnCoordinator {
                 translatedText: response?.text ?? "",
                 isSourceFinal: source.isFinal,
                 isTranslationFinal: response?.isFinal ?? false,
-                creationIndex: source.creationIndex
+                creationIndex: source.creationIndex,
+                status: status,
+                timestamp: source.timestamp
             )
             snapshots.append(snapshot)
 
-            guard let response,
-                  source.isFinal,
-                  response.isFinal,
-                  !source.text.isEmpty,
-                  !response.text.isEmpty else {
-                continue
-            }
-
-            records.append(TranslateRecord(
+            guard status.isTerminal else { continue }
+            var record = TranslateRecord(
                 id: source.recordID,
-                timestamp: max(source.timestamp, response.timestamp),
+                timestamp: source.timestamp,
                 sessionID: sessionID,
                 sourceItemID: source.itemID,
-                responseID: response.responseID,
+                responseID: response?.responseID,
                 sourceLanguage: sourceLanguage,
                 targetLanguage: targetLanguage,
                 originalText: source.text,
-                translatedText: response.text
-            ))
+                translatedText: response?.text ?? ""
+            )
+            record.status = status
+            records.append(record)
         }
 
+        // Preserve an orphan translation explicitly rather than guessing an ASR match.
+        let linkedResponseIDs = Set(responseBySource.values)
+        for response in responses.values where !linkedResponseIDs.contains(response.responseID) {
+            guard !response.text.isEmpty,
+                  sealed || now.timeIntervalSince(response.timestamp) > 30 else { continue }
+            snapshots.append(TranslationTurnSnapshot(
+                id: response.recordID, sourceItemID: nil, responseID: response.responseID,
+                originalText: "", translatedText: response.text,
+                isSourceFinal: false, isTranslationFinal: response.isFinal,
+                creationIndex: response.creationIndex, status: .unlinked, timestamp: response.timestamp))
+            var record = TranslateRecord(id: response.recordID, timestamp: response.timestamp,
+                                         sessionID: sessionID, responseID: response.responseID,
+                                         sourceLanguage: sourceLanguage, targetLanguage: targetLanguage,
+                                         originalText: "", translatedText: response.text)
+            record.status = .unlinked
+            records.append(record)
+        }
+        snapshots.sort { $0.creationIndex < $1.creationIndex }
         return TranslationCoordinatorUpdate(turns: snapshots, recordsToUpsert: records)
     }
 }
@@ -711,7 +772,6 @@ enum TranslateClientEvent: String {
     case sessionUpdate = "session.update"
     case sessionFinish = "session.finish"
     case inputAudioBufferAppend = "input_audio_buffer.append"
-    case inputImageBufferAppend = "input_image_buffer.append"
 }
 
 enum TranslateServerEvent: String {

@@ -6,81 +6,63 @@
 import SwiftUI
 
 struct LiveTranslateView: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    private let coral = Color(red: 0.98, green: 0.36, blue: 0.39)
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = LiveTranslateViewModel()
     @ObservedObject var streamViewModel: StreamSessionViewModel
     @State private var showSettings = false
     @State private var shouldAutoScroll = true
+    @State private var languageBarHeight: CGFloat = 0
 
     var body: some View {
         ZStack {
             // 背景
-            Color.black.ignoresSafeArea()
-
-            // 视频预览（如果启用图像增强）
-            if viewModel.imageEnhanceEnabled {
-                videoBackground
-            }
+            Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
 
             // 主内容
             VStack(spacing: 0) {
                 // Header
                 headerView
 
-                // 语言选择栏
-                languageBar
-
-                visionPrivacyBar
-
-                // 翻译结果区域
+                // The scroll viewport extends behind the fixed glass language bar.
                 translationArea
+                    .overlay(alignment: .top) {
+                        languageBar
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                                languageBarHeight = $0
+                            }
+                    }
             }
-            // Float the microphone above the list so controls do not reduce the
-            // scroll viewport. The list reserves matching bottom content space.
-            .overlay(alignment: .bottom) {
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 controlBar
                     .frame(maxWidth: .infinity)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.black.opacity(0), Color.black.opacity(0.92)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .ignoresSafeArea(edges: .bottom)
-                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
             }
+
         }
         .task {
-            // Entering with vision off releases a camera session left by a
-            // previous feature, preserving the zero-capture privacy contract.
-            if !viewModel.imageEnhanceEnabled,
-               streamViewModel.streamingStatus != .stopped {
+            // Translation is audio-only; release camera capture from a previous feature.
+            if streamViewModel.streamingStatus != .stopped {
                 await streamViewModel.stopSession()
             }
             guard !Task.isCancelled else { return }
             viewModel.connect()
-            if viewModel.imageEnhanceEnabled {
-                await streamViewModel.startSession()
-            }
         }
         .onDisappear {
             viewModel.disconnect()
-            stopVideoStream()
         }
         .sheet(isPresented: $showSettings) {
             LiveTranslateSettingsView(viewModel: viewModel)
         }
         .alert("livetranslate.error.title".localized, isPresented: $viewModel.showError) {
+            if viewModel.errorMessage == "livetranslate.saveFailed".localized {
+                Button("livetranslate.retrySave".localized) { viewModel.retrySavingRecords() }
+            }
             Button("common.ok".localized, role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage ?? "")
-        }
-        .onChange(of: viewModel.imageEnhanceEnabled) { _, newValue in
-            if newValue {
-                startVideoStream()
-            } else {
-                stopVideoStream()
-            }
         }
     }
 
@@ -95,12 +77,9 @@ struct LiveTranslateView: View {
                 Text("livetranslate.title".localized)
                     .font(AppTypography.title2)
             }
-            .foregroundColor(.white)
+            .foregroundColor(.primary)
 
             Spacer()
-
-            // 连接状态
-            connectionIndicator
 
             // 设置按钮
             Button {
@@ -108,21 +87,26 @@ struct LiveTranslateView: View {
             } label: {
                 Image(systemName: "gearshape.fill")
                     .font(.title3)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.primary)
             }
-            .padding(.horizontal, 8)
+            .frame(width: 44, height: 44)
+            .modifier(TranslationGlass(reduceTransparency: reduceTransparency))
+            .accessibilityLabel("settings.title".localized)
 
             // 关闭按钮
             Button {
                 dismiss()
             } label: {
-                Image(systemName: "xmark.circle.fill")
+                Image(systemName: "xmark")
                     .font(.title2)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.primary)
             }
+            .frame(width: 44, height: 44)
+            .modifier(TranslationGlass(reduceTransparency: reduceTransparency))
+            .accessibilityLabel("livetranslate.close".localized)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
     }
 
     private var connectionIndicator: some View {
@@ -132,7 +116,7 @@ struct LiveTranslateView: View {
                 .frame(width: 8, height: 8)
             Text(viewModel.isConnected ? "livetranslate.connected".localized : "livetranslate.connecting".localized)
                 .font(AppTypography.caption)
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(.secondary)
         }
     }
 
@@ -155,10 +139,12 @@ struct LiveTranslateView: View {
             } label: {
                 Image(systemName: "arrow.left.arrow.right")
                     .font(.title3)
-                    .foregroundColor(.white)
-                    .padding(12)
-                    .background(Circle().fill(Color.white.opacity(0.2)))
+                    .foregroundColor(.primary)
+                    .frame(width: 44, height: 44)
+                    .foregroundStyle(coral)
             }
+
+            .accessibilityLabel("livetranslate.swap".localized)
 
             // 目标语言
             languageButton(
@@ -168,8 +154,10 @@ struct LiveTranslateView: View {
                 showSettings = true
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(8)
+        .modifier(TranslationGlass(reduceTransparency: reduceTransparency))
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
     }
 
     private func languageButton(language: TranslateLanguage, label: String, action: @escaping () -> Void) -> some View {
@@ -177,21 +165,19 @@ struct LiveTranslateView: View {
             VStack(spacing: 4) {
                 Text(label)
                     .font(AppTypography.caption)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.secondary)
                 HStack(spacing: 6) {
                     Text(language.flag)
                         .font(.title2)
                     Text(language.displayName)
                         .font(AppTypography.body)
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                 }
             }
-            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 4)
             .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.1))
-            )
+
         }
     }
 
@@ -205,21 +191,9 @@ struct LiveTranslateView: View {
                         if viewModel.currentSessionRecords.isEmpty && viewModel.activeTurns.isEmpty {
                             Text("livetranslate.placeholder".localized)
                                 .font(AppTypography.body)
-                                .foregroundColor(.white.opacity(0.4))
+                                .foregroundColor(.secondary)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 48)
-                        }
-
-                        ForEach(viewModel.currentSessionRecords) { record in
-                            translationCard(
-                                id: record.id,
-                                original: record.originalText,
-                                translated: record.translatedText,
-                                source: record.sourceLanguage,
-                                target: record.targetLanguage,
-                                timestamp: record.timestamp,
-                                isStreaming: false
-                            )
                         }
 
                         ForEach(viewModel.activeTurns) { turn in
@@ -227,18 +201,20 @@ struct LiveTranslateView: View {
                                 id: turn.id,
                                 original: turn.originalText,
                                 translated: turn.translatedText,
-                                source: viewModel.sourceLanguage,
-                                target: viewModel.targetLanguage,
-                                timestamp: Date(),
-                                isStreaming: true
+                                source: turn.sourceLanguage,
+                                target: turn.targetLanguage,
+                                timestamp: turn.timestamp,
+                                status: turn.status
                             )
                         }
 
-                        Color.clear.frame(height: 116).id("translation-bottom")
+                        Color.clear.frame(height: 16).id("translation-bottom")
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
                 }
+                .contentMargins(.top, languageBarHeight, for: .scrollContent)
+                .contentMargins(.top, languageBarHeight, for: .scrollIndicators)
                 .simultaneousGesture(DragGesture().onChanged { _ in
                     shouldAutoScroll = false
                 })
@@ -252,26 +228,25 @@ struct LiveTranslateView: View {
                 if !shouldAutoScroll {
                     Button {
                         shouldAutoScroll = true
-                        withAnimation { proxy.scrollTo("translation-bottom", anchor: .bottom) }
+                        proxy.scrollTo("translation-bottom", anchor: .bottom)
                     } label: {
                         Label("livetranslate.latest".localized, systemImage: "arrow.down")
                             .font(AppTypography.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Capsule().fill(Color.blue))
-                            .foregroundColor(.white)
+                            .modifier(TranslationGlass(reduceTransparency: reduceTransparency))
+                            .foregroundColor(.primary)
                     }
                     .padding(12)
                 }
             }
-            .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.08)))
+
             .onAppear {
                 DispatchQueue.main.async {
                     proxy.scrollTo("translation-bottom", anchor: .bottom)
                 }
             }
         }
-        .padding(.horizontal, 6)
         .frame(maxHeight: .infinity)
     }
 
@@ -282,68 +257,54 @@ struct LiveTranslateView: View {
         source: TranslateLanguage,
         target: TranslateLanguage,
         timestamp: Date,
-        isStreaming: Bool
+        status: TranslationTurnStatus
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("\(source.flag) → \(target.flag)")
                 Spacer()
-                Text(isStreaming ? "livetranslate.translating".localized : timestamp.formatted(date: .omitted, time: .shortened))
+                Text(status == .completed ? timestamp.formatted(date: .omitted, time: .shortened) : status.label)
             }
             .font(AppTypography.caption)
-            .foregroundColor(.white.opacity(0.5))
+            .foregroundColor(.secondary)
 
             if !original.isEmpty {
                 Text(original)
-                    .font(.system(size: 18, weight: .regular, design: .rounded))
-                    .foregroundColor(.white.opacity(0.65))
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
                     .lineSpacing(4)
             }
             if !translated.isEmpty {
                 Text(translated)
-                    .font(.system(size: 21, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
+                    .font(.body.weight(.medium))
+                    .foregroundColor(.primary)
                     .lineSpacing(5)
             }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(isStreaming ? 0.14 : 0.08)))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24))
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2).fill(coral.opacity(status == .completed ? 0.35 : 0.8))
+                .frame(width: 3).padding(.vertical, 22)
+        }
+        .textSelection(.enabled)
         .id(id)
     }
 
-    private func scrollToLatestIfNeeded(_ proxy: ScrollViewProxy) {
-        guard shouldAutoScroll else { return }
-        withAnimation { proxy.scrollTo("translation-bottom", anchor: .bottom) }
-    }
+    @State private var lastAutoScroll = Date.distantPast
 
-    private var visionPrivacyBar: some View {
-        Toggle(isOn: $viewModel.imageEnhanceEnabled) {
-            HStack(spacing: 8) {
-                Image(systemName: viewModel.imageEnhanceEnabled ? "eye.fill" : "eye.slash.fill")
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("livetranslate.vision.title".localized)
-                        .font(AppTypography.caption)
-                    Text(viewModel.imageEnhanceEnabled
-                         ? "livetranslate.vision.on".localized
-                         : "livetranslate.vision.off".localized)
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.6))
-                }
-            }
-            .foregroundColor(.white)
-        }
-        .tint(.green)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.08)))
-        .padding(.horizontal, 8)
+    private func scrollToLatestIfNeeded(_ proxy: ScrollViewProxy) {
+        guard shouldAutoScroll, Date().timeIntervalSince(lastAutoScroll) >= 0.15 else { return }
+        lastAutoScroll = Date()
+        proxy.scrollTo("translation-bottom", anchor: .bottom)
     }
 
     // MARK: - Control Bar
 
     private var controlBar: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
+            connectionIndicator
             // 录音状态提示
             if viewModel.isRecording {
                 HStack(spacing: 8) {
@@ -352,7 +313,7 @@ struct LiveTranslateView: View {
                         .frame(width: 8, height: 8)
                     Text("livetranslate.recording".localized)
                         .font(AppTypography.caption)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.primary)
                 }
             }
 
@@ -378,62 +339,33 @@ struct LiveTranslateView: View {
             Button {
                 viewModel.toggleRecording()
             } label: {
-                ZStack {
-                    Circle()
-                        .fill(viewModel.isRecording ? Color.red : Color.blue)
-                        .frame(width: 72, height: 72)
-
-                    Image(systemName: viewModel.isFinalizing ? "hourglass" : (viewModel.isRecording ? "stop.fill" : "mic.fill"))
-                        .font(.system(size: 28))
-                        .foregroundColor(.white)
-                }
+                Label(viewModel.isFinalizing ? "livetranslate.finalizing".localized :
+                      (viewModel.isRecording ? "livetranslate.stopAction".localized : "livetranslate.startAction".localized),
+                      systemImage: viewModel.isFinalizing ? "hourglass" : (viewModel.isRecording ? "stop.fill" : "mic.fill"))
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(coral, in: Capsule())
             }
+
             .disabled(!viewModel.isConnected || viewModel.isFinalizing)
             .opacity(viewModel.isConnected && !viewModel.isFinalizing ? 1.0 : 0.5)
         }
-        .padding(.bottom, 10)
+        .padding(14)
+        .modifier(TranslationGlass(reduceTransparency: reduceTransparency))
+        .padding(.bottom, 8)
     }
 
-    // MARK: - Video Background
+}
 
-    private var videoBackground: some View {
-        Group {
-            if let frame = streamViewModel.currentVideoFrame {
-                Image(uiImage: frame)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .ignoresSafeArea()
-                    .opacity(0.3)
-            }
-        }
-        .onAppear {
-            if let frame = streamViewModel.currentVideoFrame {
-                viewModel.updateVideoFrame(frame)
-            }
-        }
-        .onChange(of: streamViewModel.currentVideoFrame) { _, frame in
-            if let frame = frame {
-                viewModel.updateVideoFrame(frame)
-            }
-        }
-    }
+private struct TranslationGlass: ViewModifier {
+    let reduceTransparency: Bool
 
-    // MARK: - Video Stream
-
-    private func startVideoStream() {
-        Task {
-            await streamViewModel.startSession()
-        }
-    }
-
-    private func stopVideoStream() {
-        Task {
-            await streamViewModel.stopSession()
+    func body(content: Content) -> some View {
+        if reduceTransparency {
+            content.background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 28))
+        } else {
+            content.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28))
         }
     }
 }
-
-// Preview requires WearablesInterface - use in app context
-// #Preview {
-//     LiveTranslateView(streamViewModel: ...)
-// }

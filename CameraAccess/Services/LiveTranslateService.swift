@@ -167,7 +167,8 @@ class LiveTranslateService: NSObject {
     var onSpeechStarted: ((_ itemID: String?) -> Void)?
     var onSpeechStopped: ((_ itemID: String?) -> Void)?
     var onResponseStarted: ((_ responseID: String) -> Void)?
-    var onResponseFinished: ((_ responseID: String) -> Void)?
+    var onResponseFinished: ((_ responseID: String, _ status: String) -> Void)?
+    var onSourceFailed: ((String) -> Void)?
     var onSessionFinished: (() -> Void)?
     /// `expected` is true for an explicit close or the mandatory close after
     /// `session.finished`; false means the caller should recover/reconnect.
@@ -187,13 +188,9 @@ class LiveTranslateService: NSObject {
     private var usePhoneMic = false
     private var preferredInputUID: String?
     private var routeChangeObserver: NSObjectProtocol?
+    private let diagnostics = TranslationDiagnostics()
     private var diagnosticEventLog: [String] = []
     private let diagnosticEventLogCapacity = 200
-
-    // Image sending. The view model invokes `sendImageFrame` once per server
-    // VAD speech-start event; this guard makes the one-frame-per-turn contract
-    // robust even if a callback is delivered more than once.
-    private var hasSentImageForSpeechTurn = false
 
     init(apiKey: String) {
         self.apiKey = apiKey
@@ -274,6 +271,7 @@ class LiveTranslateService: NSObject {
     // MARK: - WebSocket Connection
 
     func connect() {
+        diagnostics.beginSession()
         guard lifecycle.transition(from: [.disconnected, .finished, .failed], to: .connecting) else {
             print("⚠️ [Translate] 忽略重复连接，当前状态: \(lifecycle.state)")
             return
@@ -319,6 +317,7 @@ class LiveTranslateService: NSObject {
     }
 
     private func closeTransport(expected: Bool, reason: String?) {
+        diagnostics.record("transport.closed expected=\(expected)")
         let transport = transportLock.withLock { () -> (URLSessionWebSocketTask?, URLSession?) in
             let value = (webSocket, urlSession)
             webSocket = nil
@@ -435,6 +434,7 @@ class LiveTranslateService: NSObject {
     /// VAD turn. Completion waits for both session.finished and local audio
     /// playback, with a bounded timeout for network failures.
     func finishSession(timeout: TimeInterval = 8) async {
+        diagnostics.record("session.finish.requested")
         stopRecording()
         guard lifecycle.transition(from: [.recording, .ready], to: .finishing) else { return }
         guard transportLock.withLock({ webSocket != nil }) else {
@@ -491,6 +491,7 @@ class LiveTranslateService: NSObject {
 
     @discardableResult
     func startRecording(usePhoneMic: Bool = false) -> Bool {
+        diagnostics.record("recording.start.requested")
         guard !isRecording, lifecycle.state == .ready else {
             print("⚠️ [Translate] 当前 Session 尚未就绪，无法录音: \(lifecycle.state)")
             return false
@@ -683,13 +684,13 @@ class LiveTranslateService: NSObject {
     }
 
     func stopRecording() {
+        diagnostics.record("recording.stop")
         guard isRecording else { return }
 
         print("🛑 [Translate] 停止录音")
         audioEngine?.inputNode.removeTap(onBus: 0)
         audioEngine?.stop()
         isRecording = false
-        hasSentImageForSpeechTurn = false
     }
 
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
@@ -772,46 +773,6 @@ class LiveTranslateService: NSObject {
         let base64Audio = data.base64EncodedString()
 
         sendAudioAppend(base64Audio)
-    }
-
-    // MARK: - Image Sending
-
-    func sendImageFrame(_ image: UIImage) {
-        guard !hasSentImageForSpeechTurn else {
-            return
-        }
-        hasSentImageForSpeechTurn = true
-
-        // The caller invokes this once after speech_started. Do not use a
-        // repeating timer or a global 500 ms throttle: each VAD turn should
-        // get its own latest frame, including short consecutive turns.
-        guard webSocket != nil else {
-            hasSentImageForSpeechTurn = false
-            return
-        }
-
-        guard let imageData = image.jpegData(compressionQuality: 0.6) else {
-            hasSentImageForSpeechTurn = false
-            print("❌ [Translate] 无法压缩图片")
-            return
-        }
-
-        // 限制图片大小 500KB
-        guard imageData.count <= 500 * 1024 else {
-            hasSentImageForSpeechTurn = false
-            print("⚠️ [Translate] 图片过大，跳过发送")
-            return
-        }
-
-        let base64Image = imageData.base64EncodedString()
-        print("📸 [Translate] 发送图片: \(imageData.count) bytes")
-
-        let event: [String: Any] = [
-            "event_id": generateEventId(),
-            "type": TranslateClientEvent.inputImageBufferAppend.rawValue,
-            "image": base64Image
-        ]
-        sendEvent(event)
     }
 
     // MARK: - Send Events
@@ -914,7 +875,6 @@ class LiveTranslateService: NSObject {
                 self.onConnected?()
 
             case TranslateServerEvent.inputAudioBufferSpeechStarted.rawValue:
-                self.hasSentImageForSpeechTurn = false
                 self.onSpeechStarted?(json["item_id"] as? String)
 
             case TranslateServerEvent.inputAudioBufferSpeechStopped.rawValue:
@@ -967,7 +927,9 @@ class LiveTranslateService: NSObject {
             case TranslateServerEvent.sourceTranscriptFailed.rawValue:
                 let message = (json["error"] as? [String: Any])?["message"] as? String
                     ?? "Source transcription failed"
-                self.onError?(message)
+                if let itemID = json["item_id"] as? String { self.onSourceFailed?(itemID) }
+                print("⚠️ [Translate] Source transcription failed")
+                _ = message
 
             case TranslateServerEvent.responseAudioTranscriptText.rawValue:
                 guard let responseID = json["response_id"] as? String else { return }
@@ -1024,7 +986,31 @@ class LiveTranslateService: NSObject {
             case TranslateServerEvent.responseDone.rawValue:
                 let responseID = (json["response"] as? [String: Any])?["id"] as? String
                     ?? json["response_id"] as? String
-                if let responseID { self.onResponseFinished?(responseID) }
+                if let responseID {
+                    let response = json["response"] as? [String: Any] ?? [:]
+                    let status = response["status"] as? String ?? "incomplete"
+                    if let outputs = response["output"] as? [[String: Any]] {
+                        if outputs.isEmpty && status == "completed" {
+                            self.onTranslation?(.init(responseID: responseID, itemID: nil,
+                                                      confirmedText: "", pendingText: "", isFinal: true))
+                        }
+                        for item in outputs where item["role"] as? String == "assistant" {
+                            guard let itemID = item["id"] as? String else { continue }
+                            self.onResponseItem?(responseID, itemID)
+                            let content = item["content"] as? [[String: Any]] ?? []
+                            let finalText = content.compactMap { ($0["transcript"] as? String) ?? ($0["text"] as? String) }.joined()
+                            // The terminal payload is authoritative when it contains text.
+                            if !content.isEmpty || status == "completed" {
+                                self.onTranslation?(.init(responseID: responseID, itemID: itemID,
+                                                          confirmedText: finalText, pendingText: "", isFinal: true))
+                            }
+                        }
+                    }
+                    self.onResponseFinished?(responseID, status)
+                    // All audio deltas precede response.done. Even a failed or
+                    // empty response must release the ordered playback queue.
+                    self.markAudioResponseFinished(responseID)
+                }
 
             case TranslateServerEvent.sessionFinished.rawValue:
                 guard self.lifecycle.transition(from: [.finishing], to: .finished) else { return }
@@ -1216,13 +1202,24 @@ class LiveTranslateService: NSObject {
         } else if let itemID = (json["item"] as? [String: Any])?["id"] as? String {
             metadata.append("item_id=\(itemID)")
         }
-        if let previousItemID = json["previous_item_id"] as? String {
+        if let previousItemID = (json["previous_item_id"] as? String) ?? ((json["item"] as? [String: Any])?["previous_item_id"] as? String) {
             metadata.append("previous_item_id=\(previousItemID)")
         }
         if let status = (json["response"] as? [String: Any])?["status"] as? String {
             metadata.append("status=\(status)")
         }
+        if let response = json["response"] as? [String: Any],
+           let output = response["output"] as? [[String: Any]] {
+            metadata.append("output_count=\(output.count)")
+            let textCount = output.flatMap { $0["content"] as? [[String: Any]] ?? [] }
+                .reduce(0) { $0 + ((($1["transcript"] as? String) ?? ($1["text"] as? String))?.count ?? 0) }
+            metadata.append("output_text_length=\(textCount)")
+        }
         let entry = metadata.joined(separator: " ")
+        // Audio payloads and transcript text never enter the persistent log.
+        if !type.hasSuffix(".delta") && !type.hasSuffix(".text") {
+            diagnostics.record(entry)
+        }
         diagnosticEventLog.append(entry)
         if diagnosticEventLog.count > diagnosticEventLogCapacity {
             diagnosticEventLog.removeFirst(diagnosticEventLog.count - diagnosticEventLogCapacity)
@@ -1272,6 +1269,71 @@ extension LiveTranslateService: URLSessionWebSocketDelegate {
             closeTransport(expected: true, reason: reasonString)
         } else {
             failTransport(reasonString)
+        }
+    }
+}
+
+
+/// Bounded, metadata-only JSONL diagnostics. File I/O stays off the audio and UI threads.
+private final class TranslationDiagnostics: @unchecked Sendable {
+    private static let queue = DispatchQueue(label: "com.turbometa.translation.diagnostics", qos: .utility)
+    private let lock = NSLock()
+    private var sessionID = UUID().uuidString
+    private var startedAt = ProcessInfo.processInfo.systemUptime
+
+    func beginSession() {
+        lock.lock()
+        sessionID = UUID().uuidString
+        startedAt = ProcessInfo.processInfo.systemUptime
+        lock.unlock()
+        record("session.connect.requested")
+    }
+
+    func record(_ metadata: String) {
+        lock.lock()
+        let session = sessionID
+        let elapsed = ProcessInfo.processInfo.systemUptime - startedAt
+        lock.unlock()
+        let time = Date().timeIntervalSince1970
+        Self.queue.async {
+            do {
+                let manager = FileManager.default
+                let directory = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                    .appendingPathComponent("TurboMeta/Diagnostics", isDirectory: true)
+                try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+                var excluded = directory
+                var values = URLResourceValues()
+                values.isExcludedFromBackup = true
+                try excluded.setResourceValues(values)
+                let current = directory.appendingPathComponent("translation.jsonl")
+                let previous = directory.appendingPathComponent("translation.previous.jsonl")
+                // Keep at most two 1 MB files; expire logs after seven days.
+                for file in [current, previous] {
+                    if let date = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                       Date().timeIntervalSince(date) > 7 * 24 * 3600 {
+                        try manager.removeItem(at: file)
+                    }
+                }
+                if let size = try? current.resourceValues(forKeys: [.fileSizeKey]).fileSize, size >= 1_000_000 {
+                    if manager.fileExists(atPath: previous.path) { try manager.removeItem(at: previous) }
+                    try manager.moveItem(at: current, to: previous)
+                }
+                if !manager.fileExists(atPath: current.path) {
+                    manager.createFile(atPath: current.path, contents: nil,
+                                       attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication])
+                }
+                var data = try JSONSerialization.data(withJSONObject: [
+                    "timestamp": time, "session": session, "elapsedSeconds": elapsed, "event": metadata
+                ], options: [.sortedKeys])
+                data.append(0x0A)
+                let handle = try FileHandle(forWritingTo: current)
+                defer { try? handle.close() }
+                try handle.seekToEnd()
+                try handle.write(contentsOf: data)
+            } catch {
+                // Diagnostics must never interrupt translation or expose error payloads.
+                print("[TranslateDiagnostics] Unable to write diagnostic metadata")
+            }
         }
     }
 }

@@ -29,6 +29,35 @@ final class LiveTranslateHistoryStorage {
 
     private let fileURL: URL
     private let fileManager: FileManager
+    private let lock = NSRecursiveLock()
+    private let writeQueue = DispatchQueue(label: "translate.history", qos: .utility)
+    private var deletionGeneration = 0
+
+    /// Serialize disk I/O off the UI thread; a deletion invalidates queued writes.
+    func enqueue(_ incoming: [TranslateRecord], completion: @escaping ([TranslateRecord]?) -> Void) {
+        lock.lock()
+        let generation = deletionGeneration
+        lock.unlock()
+        writeQueue.async {
+            self.lock.lock()
+            guard self.deletionGeneration == generation else {
+                let current = self.loadAll()
+                self.lock.unlock()
+                DispatchQueue.main.async { completion(current) }
+                return
+            }
+            var records = self.loadAll()
+            for record in incoming {
+                if let index = records.firstIndex(where: { $0.id == record.id || (record.responseID != nil && $0.responseID == record.responseID && $0.sessionID == record.sessionID) }) {
+                    records[index] = record
+                } else { records.append(record) }
+            }
+            records.sort { $0.timestamp < $1.timestamp }
+            let saved = self.persist(records)
+            self.lock.unlock()
+            DispatchQueue.main.async { completion(saved ? records : nil) }
+        }
+    }
 
     init(fileURL: URL? = nil, fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -42,6 +71,8 @@ final class LiveTranslateHistoryStorage {
     }
 
     func loadAll() -> [TranslateRecord] {
+        lock.lock()
+        defer { lock.unlock() }
         guard let data = try? Data(contentsOf: fileURL) else { return [] }
         let decoder = JSONDecoder()
 
@@ -73,6 +104,8 @@ final class LiveTranslateHistoryStorage {
 
     @discardableResult
     func upsert(_ record: TranslateRecord) -> [TranslateRecord] {
+        lock.lock()
+        defer { lock.unlock() }
         var records = loadAll()
         if let index = records.firstIndex(where: { existing in
             existing.id == record.id ||
@@ -95,6 +128,9 @@ final class LiveTranslateHistoryStorage {
     /// cannot leave a partially updated JSON document behind.
     @discardableResult
     func deleteRecords(ids: [UUID]) -> [TranslateRecord] {
+        lock.lock()
+        defer { lock.unlock() }
+        deletionGeneration += 1
         guard !ids.isEmpty else { return loadAll() }
         let idsToDelete = Set(ids)
         let records = loadAll().filter { !idsToDelete.contains($0.id) }
@@ -108,17 +144,21 @@ final class LiveTranslateHistoryStorage {
     }
 
     func deleteAll() {
+        lock.lock()
+        defer { lock.unlock() }
+        deletionGeneration += 1
         do {
             if fileManager.fileExists(atPath: fileURL.path) {
                 try fileManager.removeItem(at: fileURL)
             }
-            NotificationCenter.default.post(name: .liveTranslateHistoryDidChange, object: self)
+            DispatchQueue.main.async { NotificationCenter.default.post(name: .liveTranslateHistoryDidChange, object: self) }
         } catch {
             print("❌ [TranslateStorage] 清空历史失败: \(error.localizedDescription)")
         }
     }
 
-    private func persist(_ records: [TranslateRecord]) {
+    @discardableResult
+    private func persist(_ records: [TranslateRecord]) -> Bool {
         do {
             let directory = fileURL.deletingLastPathComponent()
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -126,9 +166,11 @@ final class LiveTranslateHistoryStorage {
             encoder.outputFormatting = [.sortedKeys]
             let envelope = Envelope(schemaVersion: Self.currentSchemaVersion, records: records)
             try encoder.encode(envelope).write(to: fileURL, options: .atomic)
-            NotificationCenter.default.post(name: .liveTranslateHistoryDidChange, object: self)
+            DispatchQueue.main.async { NotificationCenter.default.post(name: .liveTranslateHistoryDidChange, object: self) }
+            return true
         } catch {
             print("❌ [TranslateStorage] 保存历史失败: \(error.localizedDescription)")
+            return false
         }
     }
 

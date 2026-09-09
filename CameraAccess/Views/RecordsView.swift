@@ -493,6 +493,10 @@ private struct TranslationTurnDetailCell: View {
                     .foregroundColor(AppColors.textTertiary)
             }
 
+            if let status = record.status, status != .completed {
+                Text(status.label).font(.caption).foregroundStyle(.secondary)
+            }
+
             if !record.originalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(record.originalText)
                     .font(AppTypography.body)

@@ -384,9 +384,6 @@
 "livetranslate.finalizing" = "正在完成最后一句…";
 "livetranslate.playing" = "正在播报";
 "livetranslate.pending" = "· 待播 %d 条";
-"livetranslate.vision.title" = "视觉增强";
-"livetranslate.vision.off" = "已关闭，不读取或上传画面";
-"livetranslate.vision.on" = "每轮讲话上传 1 张最新眼镜画面";
 
 // 翻译会话记录
 "records.translation.empty" = "暂无翻译会话";
@@ -411,8 +408,6 @@
 "livetranslate.settings.output" = "输出设置";
 "livetranslate.settings.audioOutput" = "语音输出";
 "livetranslate.settings.audioOutput.footer" = "粤语和希腊语目标仅支持文本输出";
-"livetranslate.settings.imageEnhance" = "视觉增强";
-"livetranslate.settings.imageEnhance.footer" = "启用视觉增强可提高同音异义词的翻译准确性";
 "livetranslate.settings.history" = "翻译历史";
 "livetranslate.settings.clearHistory" = "清空历史";
 "livetranslate.settings.clearHistory.confirm.title" = "清空翻译历史？";
@@ -625,3 +620,23 @@
 "glasses.zoom.out" = "缩小";
 "glasses.close" = "关闭";
 "glasses.fullscreen.hint" = "拖动旋转 · 双指缩放";
+
+"livetranslate.state.recognizing" = "识别中";
+"livetranslate.state.translating" = "翻译中";
+"livetranslate.state.confirming" = "确认结果中";
+"livetranslate.state.completed" = "已完成";
+"livetranslate.state.failed" = "识别或翻译失败";
+"livetranslate.state.incomplete" = "结果不完整";
+"livetranslate.state.empty" = "未返回译文";
+"livetranslate.state.timedOut" = "等待超时";
+"livetranslate.state.unlinked" = "原文与译文未关联";
+"livetranslate.saveFailed" = "翻译记录保存失败，当前页面仍保留结果，请稍后重试。";
+"livetranslate.retrySave" = "重试保存";
+
+"livetranslate.close" = "关闭";
+
+"livetranslate.swap" = "交换语言";
+
+"livetranslate.startAction" = "开始翻译";
+
+"livetranslate.stopAction" = "停止翻译";

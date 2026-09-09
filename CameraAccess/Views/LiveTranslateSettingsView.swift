@@ -118,19 +118,11 @@ struct LiveTranslateSettingsView: View {
                     .disabled(!viewModel.targetLanguage.supportsAudioOutput)
                     .opacity(viewModel.targetLanguage.supportsAudioOutput ? 1.0 : 0.5)
 
-                    Toggle(isOn: $viewModel.imageEnhanceEnabled) {
-                        HStack {
-                            Image(systemName: "eye.fill")
-                                .foregroundColor(.green)
-                            Text("livetranslate.settings.imageEnhance".localized)
-                        }
-                    }
                 } header: {
                     Text("livetranslate.settings.output".localized)
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("livetranslate.settings.audioOutput.footer".localized)
-                        Text("livetranslate.settings.imageEnhance.footer".localized)
                     }
                 }
 

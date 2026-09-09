@@ -82,15 +82,6 @@ class LiveTranslateViewModel: ObservableObject {
         }
     }
 
-    @Published var imageEnhanceEnabled: Bool {
-        didSet {
-            UserDefaults.standard.set(imageEnhanceEnabled, forKey: "translate_image_enhance")
-            if !imageEnhanceEnabled {
-                currentVideoFrame = nil
-            }
-        }
-    }
-
     /// 使用 iPhone 麦克风（而非眼镜麦克风）
     /// 眼镜麦克风适合翻译自己说的话，iPhone 麦克风适合翻译对方说的话
     @Published var usePhoneMic: Bool {
@@ -98,9 +89,6 @@ class LiveTranslateViewModel: ObservableObject {
             UserDefaults.standard.set(usePhoneMic, forKey: "translate_use_phone_mic")
         }
     }
-
-    // MARK: - Video Frame (for image enhancement)
-    var currentVideoFrame: UIImage?
 
     // MARK: - Private
     private var translateService: LiveTranslateService?
@@ -113,6 +101,9 @@ class LiveTranslateViewModel: ObservableObject {
     private var recoveryReconnectTask: Task<Void, Never>?
     private var shouldMaintainConnection = false
     private var hasFinalizedCurrentSession = false
+    private var turnWatchdog: Task<Void, Never>?
+    private var pendingDisplayTurns: [TranslationDisplayTurn] = []
+    private var displayFlushTask: Task<Void, Never>?
 
     // MARK: - Init
 
@@ -136,14 +127,6 @@ class LiveTranslateViewModel: ObservableObject {
         self.audioOutputEnabled = normalizedAudioOutputEnabled
         if savedAudioOutputEnabled != normalizedAudioOutputEnabled {
             UserDefaults.standard.set(normalizedAudioOutputEnabled, forKey: "translate_audio_enabled")
-        }
-        let privacyMigrationKey = "translate_image_privacy_default_off_v1"
-        if !UserDefaults.standard.bool(forKey: privacyMigrationKey) {
-            self.imageEnhanceEnabled = false
-            UserDefaults.standard.set(false, forKey: "translate_image_enhance")
-            UserDefaults.standard.set(true, forKey: privacyMigrationKey)
-        } else {
-            self.imageEnhanceEnabled = UserDefaults.standard.object(forKey: "translate_image_enhance") as? Bool ?? false
         }
         self.usePhoneMic = UserDefaults.standard.object(forKey: "translate_use_phone_mic") as? Bool ?? false
         // Use the local values here because `self` is not fully initialized
@@ -238,12 +221,13 @@ class LiveTranslateViewModel: ObservableObject {
 
     func disconnect() {
         shouldMaintainConnection = false
-        finalizationTask?.cancel()
-        finalizationTask = nil
         settingsReconnectTask?.cancel()
         settingsReconnectTask = nil
         recoveryReconnectTask?.cancel()
         recoveryReconnectTask = nil
+        if isRecording { stopRecording(); return }
+        if isFinalizing { return } // The finalization task retains its owner until persistence completes.
+        turnWatchdog?.cancel()
         translateService?.disconnect()
         translateService = nil
         isConnected = false
@@ -284,11 +268,23 @@ class LiveTranslateViewModel: ObservableObject {
             targetLanguage: targetLanguage
         )
         currentSessionRecords.removeAll()
+        displayFlushTask?.cancel()
+        displayFlushTask = nil
+        pendingDisplayTurns = []
         activeTurns.removeAll()
         currentTranslation = ""
         currentOriginal = ""
         streamingTranslation = ""
         isRecording = true
+        turnWatchdog?.cancel()
+        turnWatchdog = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                guard let self, self.isRecording else { return }
+                let update = self.turnCoordinator.tick()
+                self.apply(update)
+            }
+        }
     }
 
     func stopRecording() {
@@ -297,8 +293,7 @@ class LiveTranslateViewModel: ObservableObject {
         isFinalizing = true
         service.stopRecording()
 
-        finalizationTask = Task { @MainActor [weak self, weak service] in
-            guard let self, let service else { return }
+        finalizationTask = Task { @MainActor [self, service] in
             await service.finishSession()
             guard !Task.isCancelled else { return }
             guard self.translateService === service else { return }
@@ -333,12 +328,6 @@ class LiveTranslateViewModel: ObservableObject {
         // 清空当前翻译
         currentTranslation = ""
         streamingTranslation = ""
-    }
-
-    // MARK: - Video Frame
-
-    func updateVideoFrame(_ frame: UIImage) {
-        currentVideoFrame = frame
     }
 
     // MARK: - Private Methods
@@ -423,7 +412,6 @@ class LiveTranslateViewModel: ObservableObject {
                 let update = coordinator.receiveSpeechStarted(itemID: itemID)
                 self.turnCoordinator = coordinator
                 self.apply(update)
-                self.sendCurrentFrameForSpeechTurn()
             }
         }
 
@@ -451,13 +439,21 @@ class LiveTranslateViewModel: ObservableObject {
             }
         }
 
-        service.onResponseFinished = { [weak self, weak service] responseID in
+        service.onSourceFailed = { [weak self, weak service] itemID in
+            Task { @MainActor in
+                guard let self, let service, self.translateService === service else { return }
+                let update = self.turnCoordinator.receiveSourceFailure(itemID: itemID)
+                self.apply(update)
+            }
+        }
+
+        service.onResponseFinished = { [weak self, weak service] responseID, status in
             Task { @MainActor in
                 guard let self, let service,
                       self.translateService === service,
                       self.currentSessionID != nil else { return }
                 var coordinator = self.turnCoordinator
-                let update = coordinator.receiveResponseFinished(responseID: responseID)
+                let update = coordinator.receiveResponseFinished(responseID: responseID, status: status)
                 self.turnCoordinator = coordinator
                 self.apply(update)
             }
@@ -547,12 +543,9 @@ class LiveTranslateViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Turn and Image Handling
+    // MARK: - Turn Handling
 
-    /// Realtime updates stay provisional until the server has emitted
-    /// `session.finished` (or the finish timeout expires). The coordinator
-    /// omits any response that is not connected through the authoritative
-    /// assistant-item/previous-item chain.
+    /// Preserve final and partial rows after graceful completion or failure.
     private func finalizeCurrentSession() {
         guard currentSessionID != nil, !hasFinalizedCurrentSession else { return }
         hasFinalizedCurrentSession = true
@@ -560,14 +553,9 @@ class LiveTranslateViewModel: ObservableObject {
         let update = coordinator.finalize()
         turnCoordinator = coordinator
         apply(update)
-        activeTurns.removeAll()
+        turnWatchdog?.cancel()
         currentOriginal = ""
         streamingTranslation = ""
-    }
-
-    private func sendCurrentFrameForSpeechTurn() {
-        guard isRecording, imageEnhanceEnabled, let frame = currentVideoFrame else { return }
-        translateService?.sendImageFrame(frame)
     }
 
     private func apply(_ update: TranslationCoordinatorUpdate) {
@@ -575,34 +563,25 @@ class LiveTranslateViewModel: ObservableObject {
             activeTurns = []
             return
         }
-        // A finalized translation is rendered from persisted history. Later
-        // source-ASR updates upsert that same row instead of showing a duplicate.
-        let persistedIDs = Set(update.recordsToUpsert.map(\.id))
-        let persistedSourceItemIDs = Set(update.recordsToUpsert.compactMap(\.sourceItemID))
-        let persistedResponseIDs = Set(update.recordsToUpsert.compactMap(\.responseID))
-        let provisionalSnapshots = update.turns.filter { snapshot in
-            guard !persistedIDs.contains(snapshot.id),
-                  snapshot.sourceItemID.map({ !persistedSourceItemIDs.contains($0) }) ?? true,
-                  snapshot.responseID.map({ !persistedResponseIDs.contains($0) }) ?? true else {
-                return false
-            }
-
-            return true
+        // One stable timeline; completion changes the row state, not its position.
+        let turns = update.turns.map { snapshot in
+            TranslationDisplayTurn(
+                id: snapshot.id, sourceItemID: snapshot.sourceItemID, responseID: snapshot.responseID,
+                originalText: snapshot.originalText, translatedText: snapshot.translatedText,
+                isSourceFinal: snapshot.isSourceFinal, isTranslationFinal: snapshot.isTranslationFinal,
+                status: snapshot.status, timestamp: snapshot.timestamp,
+                sourceLanguage: turnCoordinator.sourceLanguage, targetLanguage: turnCoordinator.targetLanguage
+            )
         }
-        activeTurns = hasFinalizedCurrentSession
-            ? []
-            : provisionalSnapshots.map { snapshot in
-                TranslationDisplayTurn(
-                    id: snapshot.id,
-                    sourceItemID: snapshot.sourceItemID,
-                    responseID: snapshot.responseID,
-                    originalText: snapshot.originalText,
-                    translatedText: snapshot.translatedText,
-                    isSourceFinal: snapshot.isSourceFinal,
-                    isTranslationFinal: snapshot.isTranslationFinal
-                )
+        pendingDisplayTurns = turns
+        if displayFlushTask == nil {
+            displayFlushTask = Task { @MainActor [self] in
+                do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
+                if activeTurns != pendingDisplayTurns { activeTurns = pendingDisplayTurns }
+                displayFlushTask = nil
             }
-        if let latest = activeTurns.last {
+        }
+        if let latest = turns.last {
             currentOriginal = latest.originalText
             streamingTranslation = latest.translatedText
         } else {
@@ -610,20 +589,36 @@ class LiveTranslateViewModel: ObservableObject {
             streamingTranslation = ""
         }
 
-        for record in update.recordsToUpsert {
-            let signature = Self.signature(for: record)
-            guard persistedRecordSignatures[record.id] != signature else { continue }
-            persistedRecordSignatures[record.id] = signature
-            translationHistory = historyStorage.upsert(record)
-            historyRecordCount = translationHistory.count
-            currentSessionRecords = translationHistory.filter { $0.sessionID == currentSessionID }
-            currentTranslation = record.translatedText
+        let changed = update.recordsToUpsert.filter { persistedRecordSignatures[$0.id] != Self.signature(for: $0) }
+        guard !changed.isEmpty else { return }
+        for record in changed { persistedRecordSignatures[record.id] = Self.signature(for: record) }
+        let session = currentSessionID
+        historyStorage.enqueue(changed) { [self] records in
+            guard let records else {
+                errorMessage = "livetranslate.saveFailed".localized
+                showError = true
+                for record in changed where persistedRecordSignatures[record.id] == Self.signature(for: record) {
+                    persistedRecordSignatures.removeValue(forKey: record.id)
+                }
+                return
+            }
+            translationHistory = records
+            historyRecordCount = records.count
+            if currentSessionID == session {
+                currentSessionRecords = records.filter { $0.sessionID == session }
+                currentTranslation = changed.last?.translatedText ?? currentTranslation
+            }
         }
     }
 
     private static func signature(for record: TranslateRecord) -> String {
-        [record.sourceItemID ?? "", record.responseID ?? "", record.originalText, record.translatedText]
+        [record.sourceItemID ?? "", record.responseID ?? "", record.originalText, record.translatedText, record.status?.rawValue ?? "completed"]
             .joined(separator: "\u{1F}")
+    }
+
+    func retrySavingRecords() {
+        let update = turnCoordinator.tick()
+        apply(update)
     }
 
     // MARK: - Clear

@@ -312,7 +312,8 @@ final class LiveTranslateCoordinatorTests: XCTestCase {
     update = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-1", itemID: "item-1", confirmedText: "你好", pendingText: "，世界", isFinal: false)
     )
-    XCTAssertTrue(update.turns.isEmpty, "An assistant response without previous_item_id must stay hidden")
+    XCTAssertEqual(update.turns.count, 1)
+    XCTAssertEqual(update.turns.first?.translatedText, "", "Unlinked translation must not be guessed onto the source")
 
     _ = coordinator.receiveLink(sourceItemID: "source-1", responseItemID: "item-1")
     XCTAssertEqual(coordinator.finalize().turns.first?.translatedText, "你好，世界")
@@ -331,6 +332,8 @@ final class LiveTranslateCoordinatorTests: XCTestCase {
     _ = coordinator.receiveSource(
       TranslateSourceTranscriptEvent(itemID: "source-1", confirmedText: "short", pendingText: "", isFinal: true)
     )
+    _ = coordinator.receiveResponseFinished(responseID: "response-1")
+    _ = coordinator.receiveResponseFinished(responseID: "response-2")
     let update = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-1", itemID: "assistant-1", confirmedText: "短", pendingText: "", isFinal: true)
     )
@@ -353,6 +356,7 @@ final class LiveTranslateCoordinatorTests: XCTestCase {
     XCTAssertTrue(sourceUpdate.recordsToUpsert.isEmpty)
     let firstID = try! XCTUnwrap(sourceUpdate.turns.first?.id)
 
+    _ = coordinator.receiveResponseFinished(responseID: "response-1")
     let linkedUpdate = coordinator.receiveLink(
       sourceItemID: "source-1",
       responseItemID: "assistant-1"
@@ -382,6 +386,7 @@ final class LiveTranslateCoordinatorTests: XCTestCase {
     )
     XCTAssertTrue(sourceUpdate.recordsToUpsert.isEmpty)
 
+    _ = coordinator.receiveResponseFinished(responseID: "response-1")
     let linkedUpdate = coordinator.receiveLink(
       sourceItemID: "source-1",
       responseItemID: "assistant-1"
@@ -406,11 +411,11 @@ final class LiveTranslateCoordinatorTests: XCTestCase {
     )
     XCTAssertTrue(coordinator.receiveResponseFinished(responseID: "response-1").recordsToUpsert.isEmpty)
     _ = coordinator.receiveLink(sourceItemID: "source-2", responseItemID: "assistant-1")
-    XCTAssertTrue(coordinator.finalize().recordsToUpsert.isEmpty, "The response must remain incomplete until transcript.done")
+    XCTAssertFalse(coordinator.finalize().recordsToUpsert.contains { $0.status == .completed }, "Response completion alone cannot finalize the transcript")
     let finalUpdate = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-1", itemID: "assistant-1", confirmedText: "一", pendingText: "", isFinal: true)
     )
-    XCTAssertEqual(finalUpdate.recordsToUpsert.map(\.originalText), ["Two"])
+    XCTAssertEqual(finalUpdate.recordsToUpsert.filter { $0.status == .completed }.map(\.originalText), ["Two"])
   }
 
   func testExplicitItemLinksPairInterleavedResponsesByAssistantItem() {
@@ -430,6 +435,8 @@ final class LiveTranslateCoordinatorTests: XCTestCase {
     _ = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-2", itemID: "assistant-2", confirmedText: "二", pendingText: "", isFinal: true)
     )
+    _ = coordinator.receiveResponseFinished(responseID: "response-1")
+    _ = coordinator.receiveResponseFinished(responseID: "response-2")
     let update = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-1", itemID: "assistant-1", confirmedText: "一", pendingText: "", isFinal: true)
     )
@@ -461,6 +468,8 @@ final class LiveTranslateCoordinatorTests: XCTestCase {
     _ = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-2", itemID: "assistant-2", confirmedText: "Second", pendingText: "", isFinal: true)
     )
+    _ = coordinator.receiveResponseFinished(responseID: "response-1")
+    _ = coordinator.receiveResponseFinished(responseID: "response-2")
     let update = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-1", itemID: "assistant-1", confirmedText: "First", pendingText: "", isFinal: true)
     )
@@ -494,6 +503,8 @@ final class LiveTranslateCoordinatorTests: XCTestCase {
     _ = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-1", itemID: nil, confirmedText: "First", pendingText: "", isFinal: true)
     )
+    _ = coordinator.receiveResponseFinished(responseID: "response-1")
+    _ = coordinator.receiveResponseFinished(responseID: "response-2")
     let update = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-2", itemID: nil, confirmedText: "Second", pendingText: "", isFinal: true)
     )
@@ -510,6 +521,8 @@ final class LiveTranslateCoordinatorTests: XCTestCase {
     _ = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-1", itemID: nil, confirmedText: first, pendingText: "", isFinal: true)
     )
+    _ = coordinator.receiveResponseFinished(responseID: "response-1")
+    _ = coordinator.receiveResponseFinished(responseID: "response-2")
     let update = coordinator.receiveTranslation(
       TranslateTextEvent(responseID: "response-2", itemID: nil, confirmedText: extended, pendingText: "", isFinal: true)
     )
